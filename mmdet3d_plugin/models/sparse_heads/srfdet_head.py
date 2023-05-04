@@ -6,7 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from mmcv.runner import force_fp32, BaseModule, ModuleList
-from mmcv.cnn import build_activation_layer, ConvModule
+from mmcv.cnn import build_activation_layer, ConvModule, build_conv_layer
 from mmcv.cnn.bricks.transformer import build_transformer_layer_sequence
 from mmcv.ops import MultiScaleDeformableAttention
 
@@ -56,6 +56,7 @@ class SRFDetHead(BaseDenseHead):
                  num_classes=4,
                  feat_channels_lidar=256,
                  feat_channels_img=256,
+                 hidden_dim=128,
                  lidar_feat_lvls=4,
                  img_feat_lvls=4,
                  num_proposals=128,
@@ -88,6 +89,7 @@ class SRFDetHead(BaseDenseHead):
         self.use_img = use_img
         self.feat_channels_lidar = feat_channels_lidar
         self.feat_channels_img = feat_channels_img
+        self.hidden_dim = hidden_dim
         self.lidar_feat_lvls = lidar_feat_lvls
         self.img_feat_lvls = img_feat_lvls
         self.num_proposals = num_proposals
@@ -138,10 +140,22 @@ class SRFDetHead(BaseDenseHead):
         self.roi_extractor_lidar = build_roi_extractor(roi_extractor_lidar)
 
         if self.use_img:
+            # conv to reduce channels of feat map of img
+            self.img_convs = nn.ModuleList()
+            for _ in range(img_feat_lvls):
+                self.img_convs.append(build_conv_layer(
+                    dict(type='Conv2d'),
+                    feat_channels_img,  # channel of img feature map
+                    hidden_dim,  # 128
+                    kernel_size=3,
+                    padding=1,
+                    bias='auto',
+                ))
+
             # Build Dynamic Head Image
             single_head_img_ = single_head_img.copy()
             single_head_img_.update(num_classes=num_classes)
-            single_head_img_.update(feat_channels=feat_channels_img)
+            single_head_img_.update(feat_channels=hidden_dim)
             default_pooler_resolution = roi_extractor_img['roi_layer'].get(
                 'output_size')
             single_head_img_.update(
@@ -276,11 +290,12 @@ class SRFDetHead(BaseDenseHead):
             self.dpg_dw_convs_img = ModuleList()
             for lvl in range(self.img_feat_lvls - 1):
                 dw_conv_img = ConvModule(
-                    in_channels=self.feat_channels_img * (lvl + 1),
-                    out_channels=self.feat_channels_img * (lvl + 1),
+                    in_channels=self.hidden_dim * (lvl + 1),
+                    out_channels=self.hidden_dim * (lvl + 1),
                     kernel_size=3,
                     stride=2,
-                    groups=self.feat_channels_img * (lvl + 1),
+                    padding=1,
+                    groups=self.hidden_dim * (lvl + 1),
                     norm_cfg=dict(type='BN2d', eps=1e-3, momentum=0.01),
                 )
                 self.dpg_dw_convs_img.append(dw_conv_img)
@@ -369,6 +384,19 @@ class SRFDetHead(BaseDenseHead):
         if self.with_lidar_encoder:
             point_feats = self._get_lidar_encoder_feats(point_feats)
             # (list[Tensor]): shape (bs, C, H, W)
+
+        # convert image feat dim to lidar feat dim (128)
+        if self.use_img:
+            # convert img_feats chnls to hidden_chnls
+            for feat_idx, img_feat in enumerate(img_feats):
+                bs, n_cam, C, H, W = img_feat.shape
+                img_feat = img_feat.reshape(bs * n_cam, C, H, W)
+                img_feats[feat_idx] = self.img_convs[feat_idx](img_feat)
+                BN, C, H, W = img_feats[feat_idx].shape
+                img_feats[feat_idx] = img_feats[feat_idx].reshape(bs, int(BN /
+                                                                          bs),
+                                                                  C,
+                                                                  H, W)
 
         # Get init proposals
         init_proposal_boxes, proposal_feats = self._get_init_proposals(
@@ -487,23 +515,36 @@ class SRFDetHead(BaseDenseHead):
             # image dpg
             if self.use_img:
                 # initial H, W of feat map is 8x stride of grid size which is 184
-                pfeat_1_img = self.dpg_dw_convs_img[0](img_feats[0])
+                B, N, C, H, W = img_feats[0].size()
+                img_feats_0 = img_feats[0].view(B * N, C, H, W)
+                B, N, C, H, W = img_feats[1].size()
+                img_feats_1 = img_feats[1].view(B * N, C, H, W)
+                B, N, C, H, W = img_feats[2].size()
+                img_feats_2 = img_feats[2].view(B * N, C, H, W)
+                B, N, C, H, W = img_feats[3].size()
+                img_feats_3 = img_feats[3].view(B * N, C, H, W)
+
+                pfeat_1_img = self.dpg_dw_convs_img[0](img_feats_0)
                 # (bs, C, H/2, W/2)
-                pfeat_12_img = torch.cat([img_feats[1], pfeat_1_img],
+                pfeat_12_img = torch.cat([img_feats_1, pfeat_1_img],
                                          dim=1)
                 # (bs, 2C, H/2, W/2)
                 pfeat_2_img = self.dpg_dw_convs_img[1](pfeat_12_img)
                 # (bs, 2C, H/4, W/4)
-                pfeat_23_img = torch.cat([img_feats[2], pfeat_2_img],
+                pfeat_23_img = torch.cat([img_feats_2, pfeat_2_img],
                                          dim=1)
                 # (bs, 3C, H/4, W/4)
                 pfeat_3_img = self.dpg_dw_convs_img[2](pfeat_23_img)
                 # (bs, 3C, H/8, W/8)
-                pfeat_34_img = torch.cat([img_feats[3], pfeat_3_img],
+                pfeat_34_img = torch.cat([img_feats_3, pfeat_3_img],
                                          dim=1)
                 # (bs, 4C, H/8, W/8)
                 # interpolate to 30 x 30
                 pfeat_34_img = F.interpolate(pfeat_34_img, [30, 30])
+                # (bs*N, 4C, 30, 30)
+                BN, C, H, W = pfeat_34_img.shape
+                pfeat_34_img = pfeat_34_img.view(B, int(BN / B), C, H, W)
+                pfeat_34_img = pfeat_34_img.sum(dim=1)  # (bs, C, H, W)
                 dpg_weights_img = pfeat_34_img.sum(
                     dim=1)  # (bs, 30, 30)
                 dpg_weights_img = dpg_weights_img.flatten(1, 2)  # (bs, 30*30)
@@ -1896,7 +1937,7 @@ class SingleSRFDetHeadImg(BaseModule):
               self.pc_range_img[5] - self.pc_range_img[2]]])  # (1, 3)
         pc_start_ = bboxes.new_tensor(
             [[self.pc_range_img[0], self.pc_range_img[1],
-              self.pc_range_lidar[2]]])  # (1, 3)
+              self.pc_range_img[2]]])  # (1, 3)
         bboxes[..., :3] = (bboxes[..., :3] * pc_range_) + pc_start_  # (n_p, 3)
 
         # get the corners of the bboxes
@@ -1992,7 +2033,11 @@ class SingleSRFDetHeadImg(BaseModule):
                 # here the 1st dimenion values would be
                 # 0, 1, 2, 3, 4, 5, ... 18
 
-        mlvl_feats_cam = [feat[0, :, :, :, :] for feat in img_feats]
+        # mlvl_feats_cam = [feat[0, :, :, :, :] for feat in img_feats]
+        mlvl_feats_cam = []
+        for feat in img_feats:
+            bs, n_cam, C, H, W = feat.shape
+            mlvl_feats_cam.append(feat.reshape(bs*n_cam, C, H, W))
         sampled_feats = pooler(mlvl_feats_cam[:pooler.num_inputs],
                                sampled_rois)
         # (num_cam * num_prop, C, 7, 7)

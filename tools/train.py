@@ -232,21 +232,14 @@ def main():
                 param.requires_grad = False
             if 'bbox_head.bev_pos_encoder_mlvl_embed' in name:  # for encoder
                 param.requires_grad = False
-            if 'bbox_head.heatmap_head_lidar' in name:  # query init lidar
+            if 'bbox_head.dpg_dw_convs_lidar' in name:  # for dpg lidar
                 param.requires_grad = False
-            if 'bbox_head.class_encoding' in name:  # query init lidar
+            if 'bbox_head.dpg_fc1_lidar' in name:
                 param.requires_grad = False
-            if 'bbox_head.transformer.decoder.layers' in name and \
-                    'bbox_head.transformer.decoder.layers_img' not in name:
+            if 'bbox_head.dpg_fc2_lidar' in name:
                 param.requires_grad = False
-            if 'bbox_head.transformer.decoder.query_pos_emb' in name and \
-                    'bbox_head.transformer.decoder.query_pos_emb_img' not in \
-                    name:
+            if 'bbox_head.head_series_lidar' in name:
                 param.requires_grad = False
-            if 'bbox_head.prediction_heads' in name and \
-                    'bbox_head.prediction_heads_img' not in name:
-                param.requires_grad = False
-
         from torch import nn
 
         def fix_bn(m):
@@ -258,34 +251,28 @@ def main():
         model.pts_middle_encoder.apply(fix_bn)
         model.pts_backbone.apply(fix_bn)
         model.pts_neck.apply(fix_bn)
-        model.bbox_head.encoder_lidar.layers[0].apply(fix_bn)
-        model.bbox_head.encoder_lidar.layers[1].apply(fix_bn)
-        model.bbox_head.encoder_lidar.layers[2].apply(fix_bn)
-        model.bbox_head.bev_pos_encoder_mlvl_embed[0].apply(fix_bn)
-        model.bbox_head.bev_pos_encoder_mlvl_embed[1].apply(fix_bn)
-        model.bbox_head.bev_pos_encoder_mlvl_embed[2].apply(fix_bn)
-        model.bbox_head.bev_pos_encoder_mlvl_embed[3].apply(fix_bn)
-        model.bbox_head.heatmap_head_lidar[0].apply(fix_bn)
-        model.bbox_head.class_encoding.apply(fix_bn)
-        model.bbox_head.transformer.decoder.layers[0].apply(fix_bn)
-        model.bbox_head.transformer.decoder.layers[1].apply(fix_bn)
-        model.bbox_head.transformer.decoder.layers[2].apply(fix_bn)
-        model.bbox_head.transformer.decoder.layers[3].apply(fix_bn)
-        model.bbox_head.transformer.decoder.query_pos_emb[0].apply(fix_bn)
-        model.bbox_head.transformer.decoder.query_pos_emb[1].apply(fix_bn)
-        model.bbox_head.transformer.decoder.query_pos_emb[2].apply(fix_bn)
-        model.bbox_head.transformer.decoder.query_pos_emb[3].apply(fix_bn)
-        model.bbox_head.prediction_heads[0].apply(fix_bn)
-        model.bbox_head.prediction_heads[1].apply(fix_bn)
-        model.bbox_head.prediction_heads[2].apply(fix_bn)
-        model.bbox_head.prediction_heads[3].apply(fix_bn)
+        model.bbox_head.dpg_dw_convs_lidar[0].apply(fix_bn)
+        model.bbox_head.dpg_dw_convs_lidar[1].apply(fix_bn)
+        model.bbox_head.dpg_dw_convs_lidar[2].apply(fix_bn)
+        model.bbox_head.head_series_lidar[0].apply(fix_bn)
+        model.bbox_head.head_series_lidar[1].apply(fix_bn)
+        model.bbox_head.head_series_lidar[2].apply(fix_bn)
+        model.bbox_head.head_series_lidar[3].apply(fix_bn)
+        model.bbox_head.head_series_lidar[4].apply(fix_bn)
+        # model.bbox_head.head_series_lidar[5].apply(fix_bn)
+        # model.bbox_head.encoder_lidar.layers[0].apply(fix_bn)
+        # model.bbox_head.encoder_lidar.layers[1].apply(fix_bn)
+        # model.bbox_head.encoder_lidar.layers[2].apply(fix_bn)
+        # model.bbox_head.bev_pos_encoder_mlvl_embed[0].apply(fix_bn)
+        # model.bbox_head.bev_pos_encoder_mlvl_embed[1].apply(fix_bn)
+        # model.bbox_head.bev_pos_encoder_mlvl_embed[2].apply(fix_bn)
+        # model.bbox_head.bev_pos_encoder_mlvl_embed[3].apply(fix_bn)
         for name, param in model.named_parameters():
             if param.requires_grad is True:
                 logger.info(name)
                 param_grad.append(name)
             else:
                 param_nograd.append(name)
-
 
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]

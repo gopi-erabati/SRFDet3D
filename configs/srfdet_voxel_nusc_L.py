@@ -159,7 +159,7 @@ model = dict(
     ),
     # model training and testing settings
     test_cfg=dict(
-        use_nms=False,
+        use_nms=True,
         use_rotate_nms=True,
         nms_thr=0.4,
         score_thr=0.1,

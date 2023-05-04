@@ -84,9 +84,9 @@ class SRFDet(Base3DDetector):
             if self.img_backbone is not None:
                 for param in self.img_backbone.parameters():
                     param.requires_grad = False
-            if self.img_neck is not None:
-                for param in self.img_neck.parameters():
-                    param.requires_grad = False
+            # if self.img_neck is not None:
+            #     for param in self.img_neck.parameters():
+            #         param.requires_grad = False
 
     @force_fp32(apply_to=('img', 'points'))
     def forward(self, img=None, points=None, return_loss=True, **kwargs):

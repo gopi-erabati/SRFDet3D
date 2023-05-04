@@ -12,7 +12,13 @@ point_cloud_range = [-55.2, -55.2, -5.0, 55.2, 55.2, 3.0]
 sparse_shape = [41, 1472, 1472]
 grid_size = [1472, 1472, 40]
 
+img_norm_cfg = dict(
+    mean=[103.530, 116.280, 123.675],
+    std=[57.375, 57.120, 58.395],
+    to_rgb=False)
+
 lidar_feat_lvls = 4
+img_feat_lvls = 4
 
 # For nuScenes we usually do 10-class detection
 class_names = [
@@ -103,10 +109,11 @@ model = dict(
         num_classes=10,
         feat_channels_lidar=128,
         feat_channels_img=256,
+        hidden_dim=128,
         lidar_feat_lvls=lidar_feat_lvls,
         img_feat_lvls=4,
         num_proposals=900,
-        num_heads=6,
+        num_heads=5,
         deep_supervision=True,
         prior_prob=0.01,
         with_lidar_encoder=False,
@@ -139,11 +146,11 @@ model = dict(
             type='SingleSRFDetHeadLiDAR',
             num_cls_convs=2,
             num_reg_convs=3,
-            dim_feedforward=1024,
+            dim_feedforward=512,
             num_heads=8,
             dropout=0.1,
             act_cfg=dict(type='ReLU', inplace=True),
-            dynamic_conv=dict(dynamic_dim=64, dynamic_num=2),
+            dynamic_conv=dict(dynamic_dim=32, dynamic_num=2),
             pc_range=point_cloud_range,
             voxel_size=voxel_size,
         ),
@@ -151,22 +158,22 @@ model = dict(
             type='SingleSRFDetHeadImg',
             num_cls_convs=2,
             num_reg_convs=3,
-            dim_feedforward=1024,
+            dim_feedforward=512,
             num_heads=8,
             dropout=0.1,
             act_cfg=dict(type='ReLU', inplace=True),
-            dynamic_conv=dict(dynamic_dim=64, dynamic_num=2),
+            dynamic_conv=dict(dynamic_dim=32, dynamic_num=2),
             pc_range=point_cloud_range,
         ),
         roi_extractor_lidar=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
-            out_channels=256,
+            out_channels=128,
             featmap_strides=[8, 16, 32, 64]),
         roi_extractor_img=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
-            out_channels=256,
+            out_channels=128,
             featmap_strides=[4, 8, 16, 32]),
         # loss
         sync_cls_avg_factor=True,
