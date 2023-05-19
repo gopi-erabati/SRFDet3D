@@ -152,23 +152,25 @@ class SRFDetHead(BaseDenseHead):
                     bias='auto',
                 ))
 
-            # Build Dynamic Head Image
-            single_head_img_ = single_head_img.copy()
-            single_head_img_.update(num_classes=num_classes)
-            single_head_img_.update(feat_channels=hidden_dim)
-            default_pooler_resolution = roi_extractor_img['roi_layer'].get(
-                'output_size')
-            single_head_img_.update(
-                pooler_resolution=default_pooler_resolution)
-            single_head_img_.update(
-                use_focal_loss=self.use_focal_loss,
-                use_fed_loss=self.use_fed_loss)
-            single_head_module_img = build_head(single_head_img_)
-            self.head_series_img = ModuleList(
-                [copy.deepcopy(single_head_module_img) for _ in
-                 range(num_heads)])
+            # # Build Dynamic Head Image
+            # single_head_img_ = single_head_img.copy()
+            # single_head_img_.update(num_classes=num_classes)
+            # single_head_img_.update(feat_channels=hidden_dim)
+            # default_pooler_resolution = roi_extractor_img['roi_layer'].get(
+            #     'output_size')
+            # single_head_img_.update(
+            #     pooler_resolution=default_pooler_resolution)
+            # single_head_img_.update(
+            #     use_focal_loss=self.use_focal_loss,
+            #     use_fed_loss=self.use_fed_loss)
+            # single_head_module_img = build_head(single_head_img_)
+            # self.head_series_img = ModuleList(
+            #     [copy.deepcopy(single_head_module_img) for _ in
+            #      range(num_heads)])
             # ROI Extractor
             self.roi_extractor_img = build_roi_extractor(roi_extractor_img)
+        else:
+            self.roi_extractor_img = None
 
         # Build Losses
         self.loss_cls = build_loss(loss_cls)
@@ -423,20 +425,20 @@ class SRFDetHead(BaseDenseHead):
                 inter_pred_bboxes.append(pred_bboxes.clone())
             bboxes = pred_bboxes.clone().detach()
 
-        # if with image
-        if self.use_img:
-            for head_idx_img, single_head_img in enumerate(
-                    self.head_series_img):
-                pred_logits, pred_bboxes, proposal_feats = single_head_img(
-                    img_feats, bboxes, proposal_feats, self.roi_extractor_img,
-                    img_metas)
-                # (bs, n_p, #cls), (bs, n_p, 10), (bs*n_p, 256)
-                # pred boxes  center:norm and size:log
-                # [cx, cy, cz, w, l, h, sin, cos, vx, vy]
-                if self.deep_supervision:
-                    inter_pred_logits.append(pred_logits)
-                    inter_pred_bboxes.append(pred_bboxes.clone())
-                bboxes = pred_bboxes.clone().detach()
+        # # if with image
+        # if self.use_img:
+        #     for head_idx_img, single_head_img in enumerate(
+        #             self.head_series_img):
+        #         pred_logits, pred_bboxes, proposal_feats = single_head_img(
+        #             img_feats, bboxes, proposal_feats, self.roi_extractor_img,
+        #             img_metas)
+        #         # (bs, n_p, #cls), (bs, n_p, 10), (bs*n_p, 256)
+        #         # pred boxes  center:norm and size:log
+        #         # [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+        #         if self.deep_supervision:
+        #             inter_pred_logits.append(pred_logits)
+        #             inter_pred_bboxes.append(pred_bboxes.clone())
+        #         bboxes = pred_bboxes.clone().detach()
 
         if self.deep_supervision:
             inter_pred_logits = torch.stack(inter_pred_logits)
@@ -2055,6 +2057,529 @@ class SingleSRFDetHeadImg(BaseModule):
 
         sampled_feats = sampled_feats.sum(-1)  # (bs, n_p, C, 7, 7)
         sampled_feats = sampled_feats.view(bs * num_prop, C, 7, 7)
+        # (bs*n_p, C, 7, 7)
+
+        return sampled_feats
+        # (bs*n_p, C, 7, 7)
+
+
+@HEADS.register_module()
+class SingleSRFDetHead(BaseModule):
+    """
+    This is the Single Diffusion Det 3D Head
+    """
+
+    def __init__(self,
+                 num_classes=80,
+                 feat_channels=256,
+                 pooler_resolution=7,
+                 use_focal_loss=True,
+                 use_fed_loss=False,
+                 dim_feedforward=2048,
+                 num_cls_convs=1,
+                 num_reg_convs=3,
+                 num_heads=8,
+                 dropout=0.0,
+                 scale_clamp=_DEFAULT_SCALE_CLAMP,
+                 bbox_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2,
+                               0.2],
+                 act_cfg=dict(type='ReLU', inplace=True),
+                 dynamic_conv=dict(dynamic_dim=64, dynamic_num=2),
+                 pc_range=None,
+                 use_fusion=False,
+                 voxel_size=None,
+                 init_cfg=None
+                 ):
+        super(SingleSRFDetHead, self).__init__(init_cfg)
+
+        self.feat_channels = feat_channels
+        self.use_fusion = use_fusion
+
+        self.feat_channels_lidar = feat_channels
+        self.pc_range_lidar = pc_range
+        self.voxel_size_lidar = voxel_size
+
+        # Dynamic
+        self.self_attn_lidar = nn.MultiheadAttention(
+            feat_channels, num_heads, dropout=dropout)
+        self.inst_interact_lidar = DynamicConv(
+            feat_channels=feat_channels,
+            pooler_resolution=pooler_resolution,
+            dynamic_dim=dynamic_conv['dynamic_dim'],
+            dynamic_num=dynamic_conv['dynamic_num'])
+
+        self.linear1_lidar = nn.Linear(feat_channels, dim_feedforward)
+        self.dropout_lidar = nn.Dropout(dropout)
+        self.linear2_lidar = nn.Linear(dim_feedforward, feat_channels)
+
+        self.norm1_lidar = nn.LayerNorm(feat_channels)
+        self.norm2_lidar = nn.LayerNorm(feat_channels)
+        self.norm3_lidar = nn.LayerNorm(feat_channels)
+        self.dropout1_lidar = nn.Dropout(dropout)
+        self.dropout2_lidar = nn.Dropout(dropout)
+        self.dropout3_lidar = nn.Dropout(dropout)
+
+        self.activation_lidar = build_activation_layer(act_cfg)
+
+        # cls.
+        cls_module_lidar = list()
+        for _ in range(num_cls_convs):
+            cls_module_lidar.append(
+                nn.Linear(feat_channels, feat_channels, False))
+            cls_module_lidar.append(nn.LayerNorm(feat_channels))
+            cls_module_lidar.append(nn.ReLU(inplace=True))
+        self.cls_module_lidar = ModuleList(cls_module_lidar)
+
+        # reg.
+        reg_module_lidar = list()
+        for _ in range(num_reg_convs):
+            reg_module_lidar.append(
+                nn.Linear(feat_channels, feat_channels, False))
+            reg_module_lidar.append(nn.LayerNorm(feat_channels))
+            reg_module_lidar.append(nn.ReLU(inplace=True))
+        self.reg_module_lidar = ModuleList(reg_module_lidar)
+
+        # pred.
+        self.use_focal_loss = use_focal_loss
+        self.use_fed_loss = use_fed_loss
+        if self.use_focal_loss or self.use_fed_loss:
+            self.class_logits_lidar = nn.Linear(feat_channels, num_classes)
+        else:
+            self.class_logits_lidar = nn.Linear(feat_channels, num_classes + 1)
+        self.bboxes_delta_lidar = nn.Linear(feat_channels, len(bbox_weights))
+        self.scale_clamp = scale_clamp
+        self.bbox_weights = bbox_weights
+
+        if self.use_fusion:
+            self.output_fused_proj = nn.Linear(2 * feat_channels,
+                                               feat_channels)
+
+        # for srcn3d
+        if init_cfg is None:
+            self.init_cfg = [
+                dict(
+                    type='Normal', std=0.01,
+                    override=dict(name='class_logits_lidar')),
+                dict(
+                    type='Normal', std=0.001,
+                    override=dict(name='bboxes_delta_lidar'))
+            ]
+
+    def init_weights(self) -> None:
+        super(SingleSRFDetHead, self).init_weights()
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+            else:
+                # adopt the default initialization for
+                # the weight and bias of the layer norm
+                pass
+
+        bias_value = -math.log((1 - 0.01) / 0.01)
+        nn.init.constant_(self.class_logits_lidar.bias, bias_value)
+        nn.init.constant_(self.bboxes_delta_lidar.bias.data[2:], 0.0)
+
+    def forward(self, img_feats, point_feats, bboxes, prop_feats, pooler, img_metas, pooler_img=None):
+        """
+        img_feats (list[Tensor]): shape (bs, n_cam, C, H, W)
+        point_feats (list[Tensor]): shape (bs, C, H, W)
+        bboxes (Tensor): (bs, n_p, 10)
+        prop_feats (Tensor|None)
+        pooler (nn.Module)
+        time_emb (Tensor): (bs, 256*4)
+        img_metas (list[dict])
+        """
+
+        bs, n_p = bboxes.shape[:2]
+
+        if img_feats is not None:
+            img_roi_feats = self.img_feats_sampling_bboxes_roi(img_feats,
+                                                               bboxes,
+                                                               pooler_img,
+                                                               img_metas)
+            # (bs*n_p, C, 7, 7)
+        else:
+            img_roi_feats = None
+
+        if point_feats is not None:
+            points_roi_feats = self.points_feats_sampling_bboxes_roi(
+                point_feats,
+                bboxes,
+                pooler,
+                img_metas)
+            # (bs*n_p, C, 7, 7)
+        else:
+            points_roi_feats = None
+
+        # for feature fusion
+        if img_roi_feats is not None and points_roi_feats is not None and \
+                self.use_fusion:
+            feats_fused = torch.cat((img_roi_feats, points_roi_feats), dim=1)
+            feats_fused = feats_fused.permute(0, 2, 3, 1)
+            # (bs*n_p, C, 7, 7) --> (bs*n_p, 7, 7, 2C)
+            feats_fused = self.output_fused_proj(feats_fused)
+            # (bs*n_p, 7, 7, C)
+            feats_fused = feats_fused.permute(0, 3, 1, 2)
+            # (bs*n_p, 7, 7, C) --> (bs*n_p, C, 7, 7)
+            roi_feats = feats_fused
+        elif not self.use_fusion and img_roi_feats is not None and \
+                points_roi_feats is None:
+            roi_feats = img_roi_feats  # (bs*n_p, C, 7, 7)
+        elif not self.use_fusion and points_roi_feats is not None and \
+                img_roi_feats is None:
+            roi_feats = points_roi_feats  # (bs*n_p, C, 7, 7)
+
+        if prop_feats is None:
+            prop_feats = roi_feats.view(bs, n_p, self.feat_channels,
+                                        -1).mean(-1)
+            # (bs, n_p, 256, 7*7) --> (bs, n_p, 256)
+
+        roi_feats = roi_feats.view(bs * n_p, self.feat_channels,
+                                   -1).permute(2, 0, 1)
+        # (bs*n_p, 256, 7*7) --> (7*7, bs*n_p, 256)
+
+        # self_attention
+        prop_feats = prop_feats.view(bs, n_p,
+                                     self.feat_channels_lidar).permute(
+            1, 0, 2)
+        # (bs, n_p, 256) --> (n_p, bs, 256)
+        prop_feats2 = self.self_attn_lidar(prop_feats, prop_feats,
+                                           value=prop_feats)[0]
+        prop_feats = prop_feats + self.dropout1_lidar(prop_feats2)
+        prop_feats = self.norm1_lidar(prop_feats)  # (n_p, bs, 256)
+
+        # inst_interact.
+        prop_feats = prop_feats.view(n_p, bs,
+                                     self.feat_channels_lidar).permute(
+            1, 0, 2).reshape(1, bs * n_p, self.feat_channels_lidar)
+        # (n_p, bs, 256) --> (bs, n_p, 256)  -> (1, bs * n_p, 256)
+        # roi feats of shape (7*7, bs*n_p, 256)
+        prop_feats2 = self.inst_interact_lidar(prop_feats, roi_feats)
+        # (bs*n_p, 256)
+        prop_feats = prop_feats + self.dropout2_lidar(prop_feats2)
+        obj_feats = self.norm2_lidar(prop_feats)  # (bs*n_p, 256)
+
+        # FFN
+        obj_feats2 = self.linear2_lidar(
+            self.dropout_lidar(self.activation_lidar(self.linear1_lidar(
+                obj_feats))))
+        obj_feats = obj_feats + self.dropout3_lidar(obj_feats2)
+        obj_feats = self.norm3_lidar(obj_feats)  # (bs*n_p, 256)
+
+        cls_feature = obj_feats.clone()
+        reg_feature = obj_feats.clone()
+        for cls_layer in self.cls_module_lidar:
+            cls_feature = cls_layer(cls_feature)  # (bs*n_p, 256)
+        for reg_layer in self.reg_module_lidar:
+            reg_feature = reg_layer(reg_feature)  # (bs*n_p, 256)
+        class_logits = self.class_logits_lidar(cls_feature)  # (bs*n_p, #cls)
+        bboxes_deltas = self.bboxes_delta_lidar(reg_feature)  # (bs*n_p, 10)
+        pred_bboxes = self.apply_deltas_lidar(bboxes_deltas, bboxes.view(-1,
+                                                                         len(
+                                                                             self.bbox_weights)))
+        # (bs*n_p, 10)
+        # pred boxes  center:abs and size:log
+        # [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+
+        return (class_logits.view(bs, n_p, -1), pred_bboxes.view(bs, n_p,
+                                                                 -1),
+                obj_feats)
+        # (bs, n_p, #cls), (bs, n_p, 10), (bs*n_p, 256)
+        # pred boxes  center:norm and size:log
+        # [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+
+    def apply_deltas_lidar(self, deltas, boxes):
+        """Apply transformation `deltas` (dx, dy, dz, dw, dl, dh) to `boxes`.
+
+        Args:
+            deltas (Tensor): transformation deltas of shape (N, k*10),
+                where k >= 1. deltas[i] represents k potentially
+                different class-specific box transformations for
+                the single box boxes[i].
+            boxes (Tensor): boxes to transform, of shape (N, 10)
+                [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+        """
+        boxes = boxes.to(deltas.dtype)
+        deltas_split = torch.split(deltas, 1, dim=-1)
+        # ((bs, n_p, 1), ... 10)
+        boxes_split = torch.split(boxes, 1, dim=-1)
+        # ((bs, n_p, 1), ... 10)
+        if len(self.bbox_weights) == 10:
+            wx, wy, wz, ww, wl, wh, _, _, _, _ = self.bbox_weights
+        else:
+            wx, wy, wz, ww, wl, wh, _, _ = self.bbox_weights
+
+        dx = deltas_split[0] / wx
+        dy = deltas_split[1] / wy
+        dz = deltas_split[2] / wz
+        dw = deltas_split[3] / ww
+        dl = deltas_split[4] / wl
+        dh = deltas_split[5] / wh
+
+        ctr_x = boxes_split[0]
+        ctr_y = boxes_split[1]
+        ctr_z = boxes_split[2]
+        # ctr_x = boxes_split[0] * (self.pc_range[3] - self.pc_range[0]) + \
+        #     self.pc_range[0]
+        # ctr_y = boxes_split[1] * (self.pc_range[4] - self.pc_range[1]) + \
+        #         self.pc_range[1]
+        # ctr_z = boxes_split[2] * (self.pc_range[5] - self.pc_range[2]) + self.pc_range[2]
+
+        widths = torch.exp(boxes_split[3])
+        lengths = torch.exp(boxes_split[4])
+        heights = torch.exp(boxes_split[5])
+        # because log is applied at end so to reverse it
+        # widths = boxes_split[3]
+        # lengths = boxes_split[4]
+        # heights = boxes_split[5]
+
+        # Prevent sending too large values into torch.exp()
+        dw = torch.clamp(dw, max=self.scale_clamp)
+        dl = torch.clamp(dl, max=self.scale_clamp)
+        dh = torch.clamp(dh, max=self.scale_clamp)
+
+        pred_ctr_x = dx * widths + ctr_x
+        pred_ctr_y = dy * lengths + ctr_y
+        pred_ctr_z = dz * heights + ctr_z
+
+        pred_w = torch.exp(dw) * widths
+        pred_l = torch.exp(dl) * lengths
+        pred_h = torch.exp(dh) * heights  # (bs*n_p, 1)
+
+        pred_ctr_x = (pred_ctr_x - self.pc_range_lidar[0]) / (
+                self.pc_range_lidar[3] -
+                self.pc_range_lidar[0])
+        pred_ctr_y = (pred_ctr_y - self.pc_range_lidar[1]) / (
+                self.pc_range_lidar[4] -
+                self.pc_range_lidar[1])
+        pred_ctr_z = (pred_ctr_z - self.pc_range_lidar[2]) / (
+                self.pc_range_lidar[5] -
+                self.pc_range_lidar[2])
+        pred_ctr_x = torch.clamp(pred_ctr_x, max=1.0, min=0.0)
+        pred_ctr_y = torch.clamp(pred_ctr_y, max=1.0, min=0.0)
+        pred_ctr_z = torch.clamp(pred_ctr_z, max=1.0, min=0.0)
+
+        if len(self.bbox_weights) == 10:
+            pred_boxes = torch.cat(
+                [pred_ctr_x, pred_ctr_y, pred_ctr_z, pred_w.log(),
+                 pred_l.log(),
+                 pred_h.log(), deltas_split[6], deltas_split[7],
+                 deltas_split[8],
+                 deltas_split[9]], dim=-1)  # (bs*n_p, 10)
+        else:
+            pred_boxes = torch.cat(
+                [pred_ctr_x, pred_ctr_y, pred_ctr_z, pred_w.log(),
+                 pred_l.log(),
+                 pred_h.log(), deltas_split[6], deltas_split[7]],
+                dim=-1)  # (bs*n_p, 10)
+        # pred_boxes = torch.cat(
+        #     [pred_ctr_x, pred_ctr_y, pred_ctr_z, pred_w, pred_l,
+        #      pred_h, deltas_split[6], deltas_split[7], deltas_split[8],
+        #      deltas_split[9]], dim=-1)  # (bs*n_p, 10)
+
+        return pred_boxes  # (bs*n_p, 10)
+        # pred boxes  center:abs and size:log
+        # [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+
+    def img_feats_sampling_bboxes_roi(self, img_feats, bboxes, pooler,
+                                      img_metas):
+        """
+        This function samples the image features for the bboxes using pooler
+        img_feats (list[Tensor]): shape (bs, n_cam, C, H, W)
+        bboxes (Tensor): (bs, n_p, 10) [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+        pooler (nn.Module): ROI Extractor
+        img_metas (list[dict])
+        pc_range (list): [x_min, y_,in, z_min, x_max, y_max, z_max]
+        """
+
+        bboxes = bboxes.clone()
+        # convert box center to world coordinates
+        pc_range_ = bboxes.new_tensor(
+            [[self.pc_range_lidar[3] - self.pc_range_lidar[0],
+              self.pc_range_lidar[4] - self.pc_range_lidar[1],
+              self.pc_range_lidar[5] - self.pc_range_lidar[2]]])  # (1, 3)
+        pc_start_ = bboxes.new_tensor(
+            [[self.pc_range_lidar[0], self.pc_range_lidar[1],
+              self.pc_range_lidar[2]]])  # (1, 3)
+        bboxes[..., :3] = (bboxes[..., :3] * pc_range_) + pc_start_  # (n_p, 3)
+
+        # get the corners of the bboxes
+        bbox_corners = boxes3d_to_corners3d(bboxes[..., :8],
+                                            bottom_center=False, ry=False)
+        # (bs, n_p, 8, 3) in world coord
+
+        # project the corners in LiDAR coord system to six cameras
+        lidar2img = []
+        for img_meta in img_metas:
+            lidar2img.append(img_meta['lidar2img'])
+        lidar2img = np.asarray(lidar2img)
+        lidar2img = bboxes.new_tensor(lidar2img)  # (bs, num_cam, 4, 4)
+        bbox_corners = torch.cat((bbox_corners,
+                                  torch.ones_like(
+                                      bbox_corners[..., :1])), -1)
+        # (bs, n_p, 8, 4)
+        bs, num_prop = bbox_corners.size()[:2]
+        num_cam = lidar2img.size(1)
+        bbox_corners = bbox_corners.view(bs, 1, num_prop, 8, 4).repeat(1,
+                                                                       num_cam,
+                                                                       1,
+                                                                       1,
+                                                                       1).unsqueeze(
+            -1)
+        # (bs, n_p, 8, 4) --> (bs, 1, n_p, 8, 4) --> (bs, n_cam, n_p, 8, 4) -->
+        # (bs, n_cam, n_p, 8, 4, 1)
+        lidar2img = lidar2img.view(bs, num_cam, 1, 1, 4, 4).repeat(1, 1,
+                                                                   num_prop,
+                                                                   8, 1, 1)
+        # (bs, num_cam, 4, 4) --> (bs, n_cam, 1, 1, 4, 4) --> (bs, n_cam, n_p,
+        # 8, 4, 4)
+
+        bbox_cam = torch.matmul(lidar2img, bbox_corners).squeeze(-1)
+        # (bs, num_cam, num_proposals, 8, 4)
+        # (bs, n_cam, n_p, 8, 4, 4) * (bs, n_cam, n_p, 8, 4, 1) =
+        # (bs, n_cam, n_p, 8, 4, 1) --> (bs, n_cam, n_p, 8, 4)
+
+        # normalize real-world points back to normalized [-1,-1,1,1]
+        # image coordinate
+        eps = 1e-5
+        bbox_cam = bbox_cam[..., 0:2] / torch.maximum(bbox_cam[..., 2:3],
+                                                      torch.ones_like(
+                                                          bbox_cam[...,
+                                                          2:3]) * eps)  # ?
+        # (bs, n_cam, n_p, 8, 2)
+
+        box_corners_in_image = bbox_cam
+
+        # expect box_corners_in_image: [B,N, 8, 2] -- [B,num_cam,N,8,2]
+        minxy = torch.min(box_corners_in_image, dim=3).values
+        # (bs, n_cam, n_p, 2)
+        maxxy = torch.max(box_corners_in_image, dim=3).values
+        # (bs, n_cam, n_p, 2)
+
+        bbox2d = torch.cat([minxy, maxxy], dim=3).permute(0, 2, 1, 3)
+        # (bs, n_cam, n_p, 4) --> (bs, n_p, n_cam, 4)
+
+        # convert bbox2d to ROI for all cameras
+        sampled_rois = None
+        for cam_id in range(num_cam):
+            bs = img_feats[0].shape[0]
+            C = img_feats[0].shape[2]
+
+            bbox2d_percam = bbox2d[:, :, cam_id, :].reshape(bs, num_prop, 4)
+            # (bs, n_p, 4)
+
+            bbox2d_percam_list = torch.split(bbox2d_percam, 1)
+            # ((1, n_p, 4), (1, n_p, 4),...bs)
+            bbox2d_percam_list = [lvl[0, :, :] for lvl in bbox2d_percam_list]
+            # [(n_p, 4), (n_p, 4), ... bs]
+
+            if sampled_rois is None:
+                temp_roi = bbox2roi(bbox2d_percam_list)  # (bs*n_p, 5) batch_id
+                temp_roi[:, 0] = temp_roi[:, 0] + cam_id * bs
+                # batch and cam ids
+                sampled_rois = temp_roi
+            else:
+                temp_roi = bbox2roi(bbox2d_percam_list)
+                temp_roi[:, 0] = temp_roi[:, 0] + cam_id * bs
+                sampled_rois = torch.cat([sampled_rois, temp_roi], dim=0)
+                # (bs*n_p*n_cam, 5)
+
+                # here for bs=3, n_p=4 and n_cam=6, the temp_roi[:, 0] is...
+                # cam1: 0000,1111,2222
+                # cam2: 3333,4444,5555
+                # cam3: 6666,7777,8888
+                # cam4: 9999, 10101010, 11111111 and so on
+
+                # img_feat_lvl is (bs, n_cam, C, H, W)
+                # but extarctor expects it to be (bs, C, H, W)
+                # so lets permute img_feat_lvl to (bs*n_cam, C, H, W)
+                # here the 1st dimenion values would be
+                # 0, 1, 2, 3, 4, 5, ... 18
+
+        # mlvl_feats_cam = [feat[0, :, :, :, :] for feat in img_feats]
+        mlvl_feats_cam = []
+        for feat in img_feats:
+            bs, n_cam, C, H, W = feat.shape
+            mlvl_feats_cam.append(feat.reshape(bs*n_cam, C, H, W))
+        sampled_feats = pooler(mlvl_feats_cam[:pooler.num_inputs],
+                               sampled_rois)
+        # (num_cam * num_prop, C, 7, 7)
+        sampled_feats = sampled_feats.view(num_cam, bs, num_prop, C, 7, 7)
+        # (n_cam, bs, n_p, C, 7, 7)
+        sampled_feats = sampled_feats.permute(1, 0, 2, 3, 4, 5)
+        # (bs, n_cam, n_p, C, 7, 7)
+        sampled_feats = sampled_feats.permute(0, 2, 3, 1, 4, 5)
+        # (bs, n_cam, n_p, C, 7, 7) --> (bs, n_p, C, n_cam, 7, 7)
+        sampled_feats = sampled_feats.reshape(bs, num_prop, C, num_cam, 7, 7)
+        sampled_feats = sampled_feats.permute(0, 1, 2, 4, 5, 3)
+        # (bs, n_p, C, n_cam, 7, 7) --> (bs, n_p, C, 7, 7, n_cam)
+
+        sampled_feats = sampled_feats.sum(-1)  # (bs, n_p, C, 7, 7)
+        sampled_feats = sampled_feats.view(bs * num_prop, C, 7, 7)
+        # (bs*n_p, C, 7, 7)
+
+        return sampled_feats
+        # (bs*n_p, C, 7, 7)
+
+    def points_feats_sampling_bboxes_roi(self, points_feats, bboxes, pooler,
+                                         img_metas):
+        """
+        This function samples the LiDAR features for the bboxes using pooler
+        points_feats (list[Tensor]): shape (bs, 256, H, W) stride 8, 16, 32, 64
+        bboxes (Tensor): (bs, n_p, 10) [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+        pooler (nn.Module): ROI Extractor
+        img_metas (list[dict])
+        pc_range (list): [x_min, y_,in, z_min, x_max, y_max, z_max]
+        """
+
+        # convert box center to world coordinates
+        pc_range_ = bboxes.new_tensor(
+            [[self.pc_range_lidar[3] - self.pc_range_lidar[0],
+              self.pc_range_lidar[4] - self.pc_range_lidar[1],
+              self.pc_range_lidar[5] - self.pc_range_lidar[2]]])  # (1, 3)
+        pc_start_ = bboxes.new_tensor(
+            [[self.pc_range_lidar[0], self.pc_range_lidar[1],
+              self.pc_range_lidar[2]]])  # (1, 3)
+        bboxes[..., :3] = (bboxes[..., :3] * pc_range_) + pc_start_  # (n_p, 3)
+
+        # get the corners of the bboxes
+        bbox_corners = boxes3d_to_corners3d(bboxes[..., :8],
+                                            bottom_center=False, ry=False)
+        # (bs, n_p, 8, 3) in world coord
+
+        # convert corners to range [0, 110.4]
+        pc_start_ = bboxes.new_tensor(
+            [[self.pc_range_lidar[0], self.pc_range_lidar[1],
+              self.pc_range_lidar[2]]])  # (1, 3)
+        bbox_corners = bbox_corners - pc_start_  # (bs, n_p, 8, 3)
+
+        # divide by voxel size to get index on BEV
+        bbox_corners[..., 0:1] = bbox_corners[..., 0:1] / \
+                                 self.voxel_size_lidar[0]
+        bbox_corners[..., 1:2] = bbox_corners[..., 1:2] / \
+                                 self.voxel_size_lidar[1]
+        # range [0, 1472]
+
+        bbox_corners_bev = bbox_corners[..., :2]  # (bs, n_p, 8, 2)
+
+        # expect box_corners_in_bev: [B,N, 8, 2] -- [B,num_cam,N,8,2]
+        minxy = torch.min(bbox_corners_bev, dim=2).values
+        # (bs, n_p, 2)
+        maxxy = torch.max(bbox_corners_bev, dim=2).values
+        # (bs, n_p, 2)
+
+        bbox2d = torch.cat([minxy, maxxy], dim=2)
+        # (bs, n_p, 4)
+
+        # convert bbox2d to ROI
+        bbox2d_list = torch.split(bbox2d, 1)
+        # ((1, n_p, 4), (1, n_p, 4),...bs)
+        bbox2d_list = [lvl[0, :, :] for lvl in bbox2d_list]
+        # [(n_p, 4), (n_p, 4), ... bs]
+
+        rois = bbox2roi(bbox2d_list)  # (bs*n_p, 5) batch_id
+
+        sampled_feats = pooler(points_feats[:pooler.num_inputs], rois)
         # (bs*n_p, C, 7, 7)
 
         return sampled_feats
