@@ -77,7 +77,7 @@ model = dict(
         norm_cfg=dict(type='BN2d', eps=1e-3, momentum=0.01),
         act_cfg=dict(type='ReLU'),
         in_channels=[128, 256],
-        out_channels=256,
+        out_channels=128,
         start_level=0,
         num_outs=4,
         add_extra_convs='on_output',
@@ -85,12 +85,12 @@ model = dict(
     bbox_head=dict(
         type='SRFDetHead',
         num_classes=len(class_names),
-        feat_channels_lidar=256,
+        feat_channels_lidar=128,
         feat_channels_img=256,
         lidar_feat_lvls=lidar_feat_lvls,
         img_feat_lvls=4,
         num_proposals=900,
-        num_heads=6,
+        num_heads=5,
         deep_supervision=True,
         prior_prob=0.01,
         with_lidar_encoder=False,
@@ -123,12 +123,12 @@ model = dict(
             type='SingleSRFDetHeadLiDAR',
             num_cls_convs=2,
             num_reg_convs=3,
-            dim_feedforward=1024,
+            dim_feedforward=512,
             num_heads=8,
             dropout=0.1,
             bbox_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             act_cfg=dict(type='ReLU', inplace=True),
-            dynamic_conv=dict(dynamic_dim=64, dynamic_num=2),
+            dynamic_conv=dict(dynamic_dim=32, dynamic_num=2),
             pc_range=point_cloud_range,
             voxel_size=voxel_size,
         ),
@@ -146,7 +146,7 @@ model = dict(
         roi_extractor_lidar=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
-            out_channels=256,
+            out_channels=128,
             featmap_strides=[8, 16, 32, 64]),
         roi_extractor_img=dict(
             type='SingleRoIExtractor',
@@ -203,20 +203,20 @@ file_client_args = dict(backend='disk')
 train_pipeline = [
     dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=6, use_dim=5),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
-    dict(type='ObjectSample',
-         db_sampler=dict(
-             data_root=data_root,
-             info_path=data_root + '/waymo_dbinfos_train.pkl',
-             rate=1.0,
-             prepare=dict(
-                 filter_by_difficulty=[-1],
-                 filter_by_min_points=dict(Car=5, Pedestrian=10, Cyclist=10)),
-             classes=class_names,
-             sample_groups=dict(Car=15, Pedestrian=10, Cyclist=10),
-             points_loader=dict(
-                 type='LoadPointsFromFile', coord_type='LIDAR', load_dim=6,
-                 use_dim=[0, 1, 2, 3, 4]))
-         ),
+    # dict(type='ObjectSample',
+    #      db_sampler=dict(
+    #          data_root=data_root,
+    #          info_path=data_root + '/waymo_dbinfos_train.pkl',
+    #          rate=1.0,
+    #          prepare=dict(
+    #              filter_by_difficulty=[-1],
+    #              filter_by_min_points=dict(Car=5, Pedestrian=10, Cyclist=10)),
+    #          classes=class_names,
+    #          sample_groups=dict(Car=15, Pedestrian=10, Cyclist=10),
+    #          points_loader=dict(
+    #              type='LoadPointsFromFile', coord_type='LIDAR', load_dim=6,
+    #              use_dim=[0, 1, 2, 3, 4]))
+    #      ),
     dict(
         type='RandomFlip3D',
         sync_2d=False,
@@ -259,15 +259,15 @@ test_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=4,
+    samples_per_gpu=6,
     workers_per_gpu=6,
     train=dict(
         type='RepeatDataset',
-        times=2,
+        times=1,
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
-            load_interval=5,
+            load_interval=1,
             ann_file=data_root + '/waymo_infos_train.pkl',
             split='training',
             pipeline=train_pipeline,
@@ -336,7 +336,7 @@ lr_config = dict(
 #     step_ratio_up=0.4)
 
 total_epochs = 36
-evaluation = dict(interval=1, pipeline=test_pipeline)
+evaluation = dict(interval=36, pipeline=test_pipeline)
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 
@@ -350,7 +350,7 @@ log_config = dict(
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = None
-load_from = './ckpts/mmfdetr3d_L_enc2lay_defattn_waymo_epoch_36.pth'
+load_from = './ckpts/msf3detr_voxel_waymo_epoch_36.pth'
 resume_from = None
 workflow = [('train', 1)]
 

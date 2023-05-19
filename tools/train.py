@@ -232,14 +232,14 @@ def main():
                 param.requires_grad = False
             if 'bbox_head.bev_pos_encoder_mlvl_embed' in name:  # for encoder
                 param.requires_grad = False
-            if 'bbox_head.dpg_dw_convs_lidar' in name:  # for dpg lidar
-                param.requires_grad = False
-            if 'bbox_head.dpg_fc1_lidar' in name:
-                param.requires_grad = False
-            if 'bbox_head.dpg_fc2_lidar' in name:
-                param.requires_grad = False
-            if 'bbox_head.head_series_lidar' in name:
-                param.requires_grad = False
+            # if 'bbox_head.dpg_dw_convs_lidar' in name:  # for dpg lidar
+            #     param.requires_grad = False
+            # if 'bbox_head.dpg_fc1_lidar' in name:
+            #     param.requires_grad = False
+            # if 'bbox_head.dpg_fc2_lidar' in name:
+            #     param.requires_grad = False
+            # if 'bbox_head.head_series_lidar' in name:
+            #     param.requires_grad = False
         from torch import nn
 
         def fix_bn(m):
@@ -251,14 +251,15 @@ def main():
         model.pts_middle_encoder.apply(fix_bn)
         model.pts_backbone.apply(fix_bn)
         model.pts_neck.apply(fix_bn)
-        model.bbox_head.dpg_dw_convs_lidar[0].apply(fix_bn)
-        model.bbox_head.dpg_dw_convs_lidar[1].apply(fix_bn)
-        model.bbox_head.dpg_dw_convs_lidar[2].apply(fix_bn)
-        model.bbox_head.head_series_lidar[0].apply(fix_bn)
-        model.bbox_head.head_series_lidar[1].apply(fix_bn)
-        model.bbox_head.head_series_lidar[2].apply(fix_bn)
-        model.bbox_head.head_series_lidar[3].apply(fix_bn)
-        model.bbox_head.head_series_lidar[4].apply(fix_bn)
+        # model.bbox_head.dpg_dw_convs_lidar[0].apply(fix_bn)
+        # model.bbox_head.dpg_dw_convs_lidar[1].apply(fix_bn)
+        # model.bbox_head.dpg_dw_convs_lidar[2].apply(fix_bn)
+        # model.bbox_head.head_series_lidar[0].apply(fix_bn)
+        # model.bbox_head.head_series_lidar[1].apply(fix_bn)
+        # model.bbox_head.head_series_lidar[2].apply(fix_bn)
+        # model.bbox_head.head_series_lidar[3].apply(fix_bn)
+        # model.bbox_head.head_series_lidar[4].apply(fix_bn)
+
         # model.bbox_head.head_series_lidar[5].apply(fix_bn)
         # model.bbox_head.encoder_lidar.layers[0].apply(fix_bn)
         # model.bbox_head.encoder_lidar.layers[1].apply(fix_bn)
