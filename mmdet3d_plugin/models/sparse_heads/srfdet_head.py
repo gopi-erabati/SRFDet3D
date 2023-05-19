@@ -277,9 +277,11 @@ class SRFDetHead(BaseDenseHead):
                 norm_cfg=dict(type='BN2d', eps=1e-3, momentum=0.01),
             )
             self.dpg_dw_convs_lidar.append(dw_conv_lidar)
-        last_fmap_size = int(self.grid_size[0] / (self.out_size_factor * (2
+        last_fmap_size_x = int(self.grid_size[0] / (self.out_size_factor * (2
                                                                           ** (self.lidar_feat_lvls - 1))))
-        self.dpg_fc1_lidar = nn.Linear(last_fmap_size*last_fmap_size, 1024)
+        last_fmap_size_y = int(self.grid_size[1] / (self.out_size_factor * (2
+                                                                          ** (self.lidar_feat_lvls - 1))))
+        self.dpg_fc1_lidar = nn.Linear(last_fmap_size_x*last_fmap_size_y, 1024)
         self.dpg_act_lidar = nn.ReLU(inplace=True)
         self.dpg_fc2_lidar = nn.Linear(1024,
                                        self.num_dpg_exp * self.num_proposals)

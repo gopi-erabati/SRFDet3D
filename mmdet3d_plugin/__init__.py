@@ -10,5 +10,5 @@ from .models.detectors import SRFDet, SRFDetWaymo
 from .models.middle_encoders import SparseEncoderCustom
 from .models.sparse_heads import (SRFDetHead, SingleSRFDetHeadImg,
                                   SingleSRFDetHeadLiDAR)
-from .models.voxel_encoders import DynamicVFECustom
+from .models.voxel_encoders import DynamicVFECustom, PillarFeatureNetCustom
 from .ops.norm import NaiveSyncBatchNorm1dCustom
