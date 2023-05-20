@@ -63,6 +63,7 @@ class SRFDetHead(BaseDenseHead):
                  num_heads=6,
                  deep_supervision=True,
                  prior_prob=0.01,
+                 is_kitti=False,
                  with_lidar_encoder=False,
                  grid_size=None,
                  out_size_factor=8,
@@ -96,6 +97,7 @@ class SRFDetHead(BaseDenseHead):
         self.num_heads = num_heads
         self.deep_supervision = deep_supervision
         self.prior_prob = prior_prob
+        self.is_kitti = is_kitti
         self.code_weights = code_weights
         self.pc_range = single_head_lidar['pc_range']
         self.test_cfg = test_cfg
@@ -132,6 +134,7 @@ class SRFDetHead(BaseDenseHead):
         single_head_lidar_.update(pooler_resolution=default_pooler_resolution)
         single_head_lidar_.update(
             use_focal_loss=self.use_focal_loss, use_fed_loss=self.use_fed_loss)
+        single_head_lidar_.update(is_kitti=is_kitti)
         single_head_module_lidar = build_head(single_head_lidar_)
         self.head_series_lidar = ModuleList(
             [copy.deepcopy(single_head_module_lidar) for _ in
@@ -141,16 +144,17 @@ class SRFDetHead(BaseDenseHead):
 
         if self.use_img:
             # conv to reduce channels of feat map of img
-            self.img_convs = nn.ModuleList()
-            for _ in range(img_feat_lvls):
-                self.img_convs.append(build_conv_layer(
-                    dict(type='Conv2d'),
-                    feat_channels_img,  # channel of img feature map
-                    hidden_dim,  # 128
-                    kernel_size=3,
-                    padding=1,
-                    bias='auto',
-                ))
+            if self.hidden_dim != self.feat_channels_img:
+                self.img_convs = nn.ModuleList()
+                for _ in range(img_feat_lvls):
+                    self.img_convs.append(build_conv_layer(
+                        dict(type='Conv2d'),
+                        feat_channels_img,  # channel of img feature map
+                        hidden_dim,  # 128
+                        kernel_size=3,
+                        padding=1,
+                        bias='auto',
+                    ))
 
             # # Build Dynamic Head Image
             # single_head_img_ = single_head_img.copy()
@@ -279,9 +283,14 @@ class SRFDetHead(BaseDenseHead):
                 norm_cfg=dict(type='BN2d', eps=1e-3, momentum=0.01),
             )
             self.dpg_dw_convs_lidar.append(dw_conv_lidar)
-        last_fmap_size = int(self.grid_size[0] / (self.out_size_factor * (2
-                                                                          ** (self.lidar_feat_lvls - 1))))
-        self.dpg_fc1_lidar = nn.Linear(last_fmap_size*last_fmap_size, 1024)
+        last_fmap_size_x = int(self.grid_size[0] / (self.out_size_factor * (2
+                                                                            ** (
+                                                                                        self.lidar_feat_lvls - 1))))
+        last_fmap_size_y = int(self.grid_size[1] / (self.out_size_factor * (2
+                                                                            ** (
+                                                                                        self.lidar_feat_lvls - 1))))
+        self.dpg_fc1_lidar = nn.Linear(last_fmap_size_x * last_fmap_size_y,
+                                       1024)
         self.dpg_act_lidar = nn.ReLU(inplace=True)
         self.dpg_fc2_lidar = nn.Linear(1024,
                                        self.num_dpg_exp * self.num_proposals)
@@ -301,7 +310,11 @@ class SRFDetHead(BaseDenseHead):
                     norm_cfg=dict(type='BN2d', eps=1e-3, momentum=0.01),
                 )
                 self.dpg_dw_convs_img.append(dw_conv_img)
-            self.dpg_fc1_img = nn.Linear(900, 1500)
+            if self.is_kitti:
+                last_imgfmap_dim = 30 * 15
+            else:
+                last_imgfmap_dim = 30 * 30
+            self.dpg_fc1_img = nn.Linear(last_imgfmap_dim, 1500)
             self.dpg_act_img = nn.ReLU(inplace=True)
             self.dpg_fc2_img = nn.Linear(1500,
                                          self.num_dpg_exp * self.num_proposals)
@@ -389,16 +402,18 @@ class SRFDetHead(BaseDenseHead):
 
         # convert image feat dim to lidar feat dim (128)
         if self.use_img:
-            # convert img_feats chnls to hidden_chnls
-            for feat_idx, img_feat in enumerate(img_feats):
-                bs, n_cam, C, H, W = img_feat.shape
-                img_feat = img_feat.reshape(bs * n_cam, C, H, W)
-                img_feats[feat_idx] = self.img_convs[feat_idx](img_feat)
-                BN, C, H, W = img_feats[feat_idx].shape
-                img_feats[feat_idx] = img_feats[feat_idx].reshape(bs, int(BN /
+            if self.hidden_dim != self.feat_channels_img:
+                # convert img_feats chnls to hidden_chnls
+                for feat_idx, img_feat in enumerate(img_feats):
+                    bs, n_cam, C, H, W = img_feat.shape
+                    img_feat = img_feat.reshape(bs * n_cam, C, H, W)
+                    img_feats[feat_idx] = self.img_convs[feat_idx](img_feat)
+                    BN, C, H, W = img_feats[feat_idx].shape
+                    img_feats[feat_idx] = img_feats[feat_idx].reshape(bs,
+                                                                      int(BN /
                                                                           bs),
-                                                                  C,
-                                                                  H, W)
+                                                                      C,
+                                                                      H, W)
 
         # Get init proposals
         init_proposal_boxes, proposal_feats = self._get_init_proposals(
@@ -410,18 +425,37 @@ class SRFDetHead(BaseDenseHead):
         bboxes[..., :3] = bboxes[..., :3].sigmoid()
 
         # Head for LiDAR
-        for head_idx_lidar, single_head_lidar in enumerate(
-                self.head_series_lidar):
-            pred_logits, pred_bboxes, proposal_feats = single_head_lidar(
-                point_feats, bboxes, proposal_feats, self.roi_extractor_lidar,
-                img_metas)
-            # (bs, n_p, #cls), (bs, n_p, 10), (bs*n_p, 256)
-            # pred boxes  center:norm and size:log
-            # [cx, cy, cz, w, l, h, sin, cos, vx, vy]
-            if self.deep_supervision and not self.use_img:
-                inter_pred_logits.append(pred_logits)
-                inter_pred_bboxes.append(pred_bboxes.clone())
-            bboxes = pred_bboxes.clone().detach()
+        if not self.use_img:
+            for head_idx_lidar, single_head_lidar in enumerate(
+                    self.head_series_lidar):
+                pred_logits, pred_bboxes, proposal_feats = single_head_lidar(
+                    point_feats, bboxes, proposal_feats,
+                    self.roi_extractor_lidar,
+                    img_metas)
+                # (bs, n_p, #cls), (bs, n_p, 10), (bs*n_p, 256)
+                # pred boxes  center:norm and size:log
+                # [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+                if self.deep_supervision:
+                    inter_pred_logits.append(pred_logits)
+                    inter_pred_bboxes.append(pred_bboxes.clone())
+                bboxes = pred_bboxes.clone().detach()
+        else:
+            # HEAD for LiDAR and Img Fusion
+            for head_idx_lidar, single_head_lidar in enumerate(
+                    self.head_series_lidar):
+                pred_logits, pred_bboxes, proposal_feats = \
+                    single_head_lidar(img_feats,
+                                      point_feats, bboxes, proposal_feats,
+                                      self.roi_extractor_lidar,
+                                      img_metas,
+                                      pooler_img=self.roi_extractor_img)
+                # (bs, n_p, #cls), (bs, n_p, 10), (bs*n_p, 256)
+                # pred boxes  center:norm and size:log
+                # [cx, cy, cz, w, l, h, sin, cos, vx, vy]
+                if self.deep_supervision:
+                    inter_pred_logits.append(pred_logits)
+                    inter_pred_bboxes.append(pred_bboxes.clone())
+                bboxes = pred_bboxes.clone().detach()
 
         # # if with image
         # if self.use_img:
@@ -542,7 +576,11 @@ class SRFDetHead(BaseDenseHead):
                                          dim=1)
                 # (bs, 4C, H/8, W/8)
                 # interpolate to 30 x 30
-                pfeat_34_img = F.interpolate(pfeat_34_img, [30, 30])
+                if self.is_kitti:
+                    last_imgfmap_dim = [30, 15]
+                else:
+                    last_imgfmap_dim = [30, 30]
+                pfeat_34_img = F.interpolate(pfeat_34_img, last_imgfmap_dim)
                 # (bs*N, 4C, 30, 30)
                 BN, C, H, W = pfeat_34_img.shape
                 pfeat_34_img = pfeat_34_img.view(B, int(BN / B), C, H, W)
@@ -2039,7 +2077,7 @@ class SingleSRFDetHeadImg(BaseModule):
         mlvl_feats_cam = []
         for feat in img_feats:
             bs, n_cam, C, H, W = feat.shape
-            mlvl_feats_cam.append(feat.reshape(bs*n_cam, C, H, W))
+            mlvl_feats_cam.append(feat.reshape(bs * n_cam, C, H, W))
         sampled_feats = pooler(mlvl_feats_cam[:pooler.num_inputs],
                                sampled_rois)
         # (num_cam * num_prop, C, 7, 7)
@@ -2086,12 +2124,14 @@ class SingleSRFDetHead(BaseModule):
                  pc_range=None,
                  use_fusion=False,
                  voxel_size=None,
+                 is_kitti=False,
                  init_cfg=None
                  ):
         super(SingleSRFDetHead, self).__init__(init_cfg)
 
         self.feat_channels = feat_channels
         self.use_fusion = use_fusion
+        self.is_kitti = is_kitti
 
         self.feat_channels_lidar = feat_channels
         self.pc_range_lidar = pc_range
@@ -2177,7 +2217,8 @@ class SingleSRFDetHead(BaseModule):
         nn.init.constant_(self.class_logits_lidar.bias, bias_value)
         nn.init.constant_(self.bboxes_delta_lidar.bias.data[2:], 0.0)
 
-    def forward(self, img_feats, point_feats, bboxes, prop_feats, pooler, img_metas, pooler_img=None):
+    def forward(self, img_feats, point_feats, bboxes, prop_feats, pooler,
+                img_metas, pooler_img=None):
         """
         img_feats (list[Tensor]): shape (bs, n_cam, C, H, W)
         point_feats (list[Tensor]): shape (bs, C, H, W)
@@ -2417,7 +2458,11 @@ class SingleSRFDetHead(BaseModule):
                                       bbox_corners[..., :1])), -1)
         # (bs, n_p, 8, 4)
         bs, num_prop = bbox_corners.size()[:2]
-        num_cam = lidar2img.size(1)
+        if self.is_kitti:
+            num_cam = 1
+            lidar2img = lidar2img.unsqueeze(1)  # (bs, num_cam=1, 4, 4)
+        else:
+            num_cam = lidar2img.size(1)
         bbox_corners = bbox_corners.view(bs, 1, num_prop, 8, 4).repeat(1,
                                                                        num_cam,
                                                                        1,
@@ -2498,7 +2543,7 @@ class SingleSRFDetHead(BaseModule):
         mlvl_feats_cam = []
         for feat in img_feats:
             bs, n_cam, C, H, W = feat.shape
-            mlvl_feats_cam.append(feat.reshape(bs*n_cam, C, H, W))
+            mlvl_feats_cam.append(feat.reshape(bs * n_cam, C, H, W))
         sampled_feats = pooler(mlvl_feats_cam[:pooler.num_inputs],
                                sampled_rois)
         # (num_cam * num_prop, C, 7, 7)
