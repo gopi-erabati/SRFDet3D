@@ -110,7 +110,7 @@ model = dict(
         norm_cfg=dict(type='BN2d', eps=1e-3, momentum=0.01),
         act_cfg=dict(type='ReLU'),
         in_channels=[128, 256],
-        out_channels=128,
+        out_channels=256,
         start_level=0,
         num_outs=4,
         init_cfg=dict(type='Pretrained',
@@ -122,14 +122,16 @@ model = dict(
     bbox_head=dict(
         type='SRFDetHead',
         num_classes=len(class_names),
-        feat_channels_lidar=128,
+        feat_channels_lidar=256,
         feat_channels_img=256,
+        hidden_dim=256,
         lidar_feat_lvls=lidar_feat_lvls,
         img_feat_lvls=4,
         num_proposals=900,
         num_heads=5,
         deep_supervision=True,
         prior_prob=0.01,
+        is_kitti=True,
         with_lidar_encoder=False,
         grid_size=grid_size,
         out_size_factor=out_size_factor,
@@ -157,17 +159,18 @@ model = dict(
         with_dpg=True,
         num_dpg_exp=4,
         single_head_lidar=dict(
-            type='SingleSRFDetHeadLiDAR',
+            type='SingleSRFDetHead',
             num_cls_convs=2,
             num_reg_convs=3,
-            dim_feedforward=512,
+            dim_feedforward=1024,
             num_heads=8,
             dropout=0.1,
             bbox_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             act_cfg=dict(type='ReLU', inplace=True),
-            dynamic_conv=dict(dynamic_dim=32, dynamic_num=2),
+            dynamic_conv=dict(dynamic_dim=64, dynamic_num=2),
             pc_range=point_cloud_range,
             voxel_size=voxel_size,
+            use_fusion=True,
         ),
         single_head_img=dict(
             type='SingleSRFDetHeadImg',
@@ -183,7 +186,7 @@ model = dict(
         roi_extractor_lidar=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
-            out_channels=128,
+            out_channels=256,
             featmap_strides=[8, 16, 32, 64]),
         roi_extractor_img=dict(
             type='SingleRoIExtractor',
@@ -202,11 +205,6 @@ model = dict(
         loss_bbox=dict(type='L1Loss',
                        reduction='sum',  # remove for Hungarian
                        loss_weight=0.25),
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint=
-            '/mnt/hdd4/achieve-itn/PhD/Code/workdirs/SRFDet/srfdet_voxel_nusc_L_fade/epoch_20.pth',
-            prefix='bbox_head.'),
     ),
     # model training and testing settings
     test_cfg=dict(
@@ -242,24 +240,6 @@ data_root = 'data/kitti/'
 
 file_client_args = dict(backend='disk')
 
-# db_sampler = dict(
-#     data_root=data_root,
-#     info_path=data_root + 'kitti_dbinfos_train.pkl',
-#     rate=1.0,
-#     prepare=dict(
-#         filter_by_difficulty=[-1],
-#         filter_by_min_points=dict(Car=5)),
-#     classes=class_names,
-#     sample_groups=dict(Car=12))
-db_sampler = dict(
-    data_root=data_root,
-    info_path=data_root + 'kitti_dbinfos_train.pkl',
-    rate=1.0,
-    prepare=dict(
-        filter_by_difficulty=[-1],
-        filter_by_min_points=dict(Car=5, Pedestrian=10, Cyclist=10)),
-    classes=class_names,
-    sample_groups=dict(Car=12, Pedestrian=6, Cyclist=6))
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
@@ -267,29 +247,22 @@ train_pipeline = [
         load_dim=4,
         use_dim=4,
         file_client_args=file_client_args),
+    dict(type='LoadImageFromFile'),
     dict(
         type='LoadAnnotations3D',
         with_bbox_3d=True,
         with_label_3d=True,
         file_client_args=file_client_args),
-    dict(type='ObjectSample', db_sampler=db_sampler),
-    dict(
-        type='ObjectNoise',
-        num_try=100,
-        translation_std=[1.0, 1.0, 0.5],
-        global_rot_range=[0.0, 0.0],
-        rot_range=[-0.78539816, 0.78539816]),
     dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
-    dict(
-        type='GlobalRotScaleTrans',
-        rot_range=[-0.78539816, 0.78539816],
-        scale_ratio_range=[0.95, 1.05]),
+    dict(type='Normalize', **img_norm_cfg),
+    dict(type='Pad', size_divisor=32),
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectNameFilter', classes=class_names),
     dict(type='PointShuffle'),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d',
+                                 'img'])
 ]
 
 test_pipeline = [
@@ -299,25 +272,22 @@ test_pipeline = [
         load_dim=4,
         use_dim=4,
         file_client_args=file_client_args),
+    dict(type='LoadImageFromFile'),
+    dict(type='Normalize', **img_norm_cfg),
+    dict(type='Pad', size_divisor=32),
     dict(
         type='MultiScaleFlipAug3D',
-        img_scale=(1333, 800),
+        img_scale=(1280, 384),
         pts_scale_ratio=1,
         flip=False,
         transforms=[
-            dict(
-                type='GlobalRotScaleTrans',
-                rot_range=[0, 0],
-                scale_ratio_range=[1., 1.],
-                translation_std=[0, 0, 0]),
-            dict(type='RandomFlip3D'),
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range),
             dict(
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
-            dict(type='Collect3D', keys=['points'])
+            dict(type='Collect3D', keys=['points', 'img'])
         ])
 ]
 
@@ -337,7 +307,7 @@ eval_pipeline = [
     dict(type='Collect3D', keys=['points'])
 ]
 data = dict(
-    samples_per_gpu=6,
+    samples_per_gpu=4,
     workers_per_gpu=6,
     train=dict(
         type='RepeatDataset',
@@ -410,7 +380,7 @@ lr_config = dict(
 #     cyclic_times=1,
 #     step_ratio_up=0.4)
 
-total_epochs = 40
+total_epochs = 20
 evaluation = dict(interval=1, pipeline=test_pipeline)
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
@@ -425,7 +395,7 @@ log_config = dict(
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = None
-load_from = None
+load_from = '/mnt/hdd4/achieve-itn/PhD/Code/workdirs/SRFDet/srfdet_voxel_kitti_L_3class_fade/epoch_39.pth'
 resume_from = None
 workflow = [('train', 1)]
 
@@ -434,3 +404,5 @@ find_unused_parameters = True
 opencv_num_threads = 0
 # set multi-process start method as `fork` to speed up the training
 mp_start_method = 'fork'
+
+freeze_lidar_components = True
