@@ -4,7 +4,7 @@ from .datasets.pipelines import (
   PhotoMetricDistortionMultiViewImage, PadMultiViewImage,
   NormalizeMultiviewImage, CropMultiViewImage, RandomScaleImageMultiViewImage,
   HorizontalRandomFlipMultiViewImage)
-from .datasets import CustomNuScenesDataset
+from .datasets import CustomNuScenesDataset, CustomWaymoDataset
 from .models.backbones import VoVNet, SECONDCustom
 from .models.detectors import SRFDet, SRFDetWaymo
 from .models.middle_encoders import SparseEncoderCustom

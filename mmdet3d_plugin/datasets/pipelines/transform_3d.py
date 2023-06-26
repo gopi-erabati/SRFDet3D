@@ -267,6 +267,61 @@ class RandomScaleImageMultiViewImage(object):
 
 
 @PIPELINES.register_module()
+class ResizeImageMultiViewImage(object):
+    """Random scale the image
+    Args:
+        scales
+    """
+
+    def __init__(self, img_size):
+        self.img_size = img_size  #(w, h)
+
+    def __call__(self, results):
+        """Call function to pad images, masks, semantic segmentation maps.
+        Args:
+            results (dict): Result dict from loading pipeline.
+        Returns:
+            dict: Updated result dict.
+        """
+        img_list = []
+        lidar2img_list = []
+        img_shape_list = []
+        for idx, (img, l2i) in enumerate(zip(results['img'], results['lidar2img'])):
+            if idx in [0, 1, 2]:
+                h, w = img.shape[:2]  #(1280, 1920)
+                img_resize, w_scale, h_scale = mmcv.imresize(img, self.img_size, return_scale=True, backend='cv2')
+                scale_factor = np.eye(4)
+                scale_factor[0, 0] *= h_scale
+                scale_factor[1, 1] *= w_scale
+                lidar2img = scale_factor @ l2i
+                img_list.append(img_resize)
+                img_shape_list.append(img_resize.shape)
+                lidar2img_list.append(lidar2img)
+            if idx in [3, 4]:
+                h, w = img.shape[:2]  # (886, 1920)
+                img_resize, w_scale, h_scale = mmcv.imresize(img[:886, :], self.img_size, return_scale=True, backend='cv2')
+                scale_factor = np.eye(4)
+                scale_factor[0, 0] *= h_scale
+                scale_factor[1, 1] *= w_scale
+                lidar2img = scale_factor @ l2i
+                img_list.append(img_resize)
+                img_shape_list.append(img_resize.shape)
+                lidar2img_list.append(lidar2img)
+        results['lidar2img'] = lidar2img_list
+        results['img'] = img_list
+        results['img_shape'] = img_shape_list
+
+        # for CustomNuscenesDataset when used for FlipMultiViewImage augmentation
+        # cam_intrinsic = [scale_factor @ ci for ci in results['cam_intrinsic']]
+        # results['cam_intrinsic'] = cam_intrinsic
+        # lidar2img = []
+        # for cam_intrinsic_, l2c in zip(cam_intrinsic, results['lidar2cam']):
+        #     lidar2img.append(cam_intrinsic_ @ l2c)
+        # results['lidar2img'] = lidar2img
+        return results
+
+
+@PIPELINES.register_module()
 class HorizontalRandomFlipMultiViewImage(object):
 
     def __init__(self, flip_ratio=0.5):

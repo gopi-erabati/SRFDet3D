@@ -1243,8 +1243,8 @@ class SRFDetHead(BaseDenseHead):
                 The third item is a (n,) tensor where each item is the
                 predicted class label of the corresponding box.
         """
-        pred_logits_lay = pred_logits[-1]
-        pred_bboxes_lay = pred_bboxes[-1]
+        pred_logits_lay = pred_logits[1]
+        pred_bboxes_lay = pred_bboxes[1]
 
         cfg = self.test_cfg
         cfg = copy.deepcopy(cfg)
@@ -1368,7 +1368,8 @@ class SingleSRFDetHeadLiDAR(BaseModule):
                  dynamic_conv=dict(dynamic_dim=64, dynamic_num=2),
                  pc_range=None,
                  voxel_size=None,
-                 init_cfg=None):
+                 init_cfg=None,
+                 is_kitti=None):
         super(SingleSRFDetHeadLiDAR, self).__init__(init_cfg)
 
         self.feat_channels_lidar = feat_channels
