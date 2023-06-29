@@ -582,8 +582,8 @@ def show_bev_result(points, coord_type,
                     for i in labelDict:
                         gt_img = draw_bev_boxes(gt_corners_show[
                                                     labelDict[i]],
-                                                gt_img, (0, 255, 0),
-                                                # palette(i, bgr=True)
+                                                gt_img,
+                                                palette(i, bgr=True),
                                                 thickness=1)
             # gt_img = mmcv.imresize(gt_img, (400, 225))
             mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_gt_{filename}.png'))
@@ -614,13 +614,14 @@ def show_bev_result(points, coord_type,
                         labelDict[i].append(j)
                     pred_img = bev_img.copy()
                     for i in labelDict:
-                        gt_img = draw_bev_boxes(pred_corners_show[
+                        pred_img = draw_bev_boxes(pred_corners_show[
                                                       labelDict[i]],
-                                                  gt_img, (255, 0, 0),
-                                                  # palette(i, bgr=True)
+                                                  pred_img,
+                                                  palette(i, bgr=True),
                                                   thickness=1)
             # pred_img = mmcv.imresize(pred_img, (400, 225))
-            mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_gt_{filename}.png'))
+            mmcv.imwrite(pred_img, osp.join(out_dir, f'bev_pred'
+                                                     f'_{filename}.png'))
 
 
 def draw_bev_boxes(gt_bboxes, img, color, thickness=1):

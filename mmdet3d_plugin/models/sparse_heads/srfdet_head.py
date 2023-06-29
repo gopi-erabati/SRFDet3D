@@ -1243,8 +1243,8 @@ class SRFDetHead(BaseDenseHead):
                 The third item is a (n,) tensor where each item is the
                 predicted class label of the corresponding box.
         """
-        pred_logits_lay = pred_logits[1]
-        pred_bboxes_lay = pred_bboxes[1]
+        pred_logits_lay = pred_logits[-1]
+        pred_bboxes_lay = pred_bboxes[-1]
 
         cfg = self.test_cfg
         cfg = copy.deepcopy(cfg)

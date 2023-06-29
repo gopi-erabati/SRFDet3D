@@ -132,9 +132,9 @@ class CustomNuScenesDataset(NuScenesDataset):
         save_imgs = True
         from tqdm import tqdm
         for i, result in tqdm(enumerate(results)):
-            if i not in [1389, 1456, 1943, 2334, 2642, 3352, 3619, 4044, 4402, 4826]:
-                continue
-            print(i)
+            # if i not in [1389, 1456, 1943, 2334, 2642, 3352, 3619, 4044, 4402, 4826]:
+            #     continue
+            # print(i)
             if 'pts_bbox' in result.keys():
                 result = result['pts_bbox']
             data_info = self.data_infos[i]
@@ -179,17 +179,17 @@ class CustomNuScenesDataset(NuScenesDataset):
             pred_labels = result['labels_3d'][inds]
             show_pred_bboxes = Box3DMode.convert(pred_bboxes_numpy, Box3DMode.LIDAR,
                                                  Box3DMode.DEPTH)
-            show_result(points_depth, show_gt_bboxes, show_pred_bboxes,
-                        out_dir,
-                        file_name, show, pred_labels=pred_labels,
-                        gt_labels=gt_labels)
+            # show_result(points_depth, show_gt_bboxes, show_pred_bboxes,
+            #             out_dir,
+            #             file_name, show, pred_labels=pred_labels,
+            #             gt_labels=gt_labels)
 
             # BEV Show and Save
-            # show_bev_result(points_org, coord_type=pipeline[0]['coord_type'],
-            #                 gt_bboxes=gt_bboxes, pred_bboxes=pred_bboxes,
-            #                 out_dir=out_dir, filename=str(i), show=show,
-            #                 pred_labels=pred_labels, gt_labels=gt_labels,
-            #                 save=save_imgs, voxel_size=0.1, bev_img_size=1024)
+            show_bev_result(points_org, coord_type=pipeline[0]['coord_type'],
+                            gt_bboxes=gt_bboxes, pred_bboxes=pred_bboxes,
+                            out_dir=out_dir, filename=str(i), show=show,
+                            pred_labels=pred_labels, gt_labels=gt_labels,
+                            save=save_imgs, voxel_size=0.1, bev_img_size=1024)
 
             # Show boxes on Image
             if self.modality['use_camera'] and 'lidar2img' in img_metas.keys():

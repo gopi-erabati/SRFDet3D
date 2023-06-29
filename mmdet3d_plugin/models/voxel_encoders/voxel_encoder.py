@@ -102,7 +102,7 @@ class DynamicVFECustom(nn.Module):
             voxel_size, point_cloud_range, average_points=True)
         self.fusion_layer = None
         if fusion_layer is not None:
-            self.fusion_layer = builder.build_fusion_layer(fusion_layer)
+            self.fusion_layer = build_fusion_layer(fusion_layer)
 
         if with_centroid_aware_vox:
             self.cen2point_pos_enc = nn.Sequential(
