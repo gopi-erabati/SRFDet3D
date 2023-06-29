@@ -129,7 +129,7 @@ class CustomNuScenesDataset(NuScenesDataset):
         assert out_dir is not None, 'Expect out_dir, got none.'
         pipeline_compose = self._get_pipeline(pipeline)
         show_threshold = 0.2
-        save_imgs = False
+        save_imgs = True
         from tqdm import tqdm
         for i, result in tqdm(enumerate(results)):
             # if i not in [1389, 1456, 1943, 2334, 2642, 3352, 3619, 4044, 4402, 4826]:
@@ -192,48 +192,48 @@ class CustomNuScenesDataset(NuScenesDataset):
                             save=save_imgs, voxel_size=0.1, bev_img_size=1024)
 
             # Show boxes on Image
-            if self.modality['use_camera'] and 'lidar2img' in img_metas.keys():
-                img = img.numpy()
-                # img is (n_views, H, W, C)
-                # need to transpose channel to last dim
-                img = img.transpose(0, 2, 3, 1)
-
-                gt_bboxes_center = gt_bboxes.bottom_center.numpy()  # (n_gt, 3)
-
-                pred_bboxes_center = pred_bboxes.bottom_center.numpy()
-
-                lidar2img = img_metas['lidar2img']  # (n_views, 4, 4)
-
-                # for each view
-                for idx, (img_view, lidar2img_view) in enumerate(zip(img,
-                                                                     lidar2img)):
-                    # check GT center in image view and apply mask to bboxes
-                    gt_center_mask = self.are_points_in_image(
-                        gt_bboxes_center, lidar2img_view, img_metas)
-                    # (n_gt, )
-                    gt_bboxes_view = gt_bboxes[gt_center_mask]
-                    gt_labels_view = gt_labels[gt_center_mask]
-
-                    # check Pred center in image view and apply mask to bboxes
-                    pred_center_mask = self.are_points_in_image(
-                        pred_bboxes_center, lidar2img_view, img_metas)
-                    # (n_pred, )
-                    pred_bboxes_view = pred_bboxes[pred_center_mask]
-                    pred_labels_view = pred_labels[pred_center_mask]
-
-                    filename_view = 'v_' + str(idx + 1)
-
-                    show_multi_modality_result(
-                        img_view,
-                        gt_bboxes_view,
-                        pred_bboxes_view,
-                        lidar2img_view,
-                        out_dir,
-                        str(i),
-                        box_mode='lidar',
-                        show=False,
-                        pred_labels=pred_labels_view,
-                        gt_labels=gt_labels_view,
-                        view=filename_view,
-                        save=save_imgs
-                    )
+            # if self.modality['use_camera'] and 'lidar2img' in img_metas.keys():
+            #     img = img.numpy()
+            #     # img is (n_views, H, W, C)
+            #     # need to transpose channel to last dim
+            #     img = img.transpose(0, 2, 3, 1)
+            #
+            #     gt_bboxes_center = gt_bboxes.bottom_center.numpy()  # (n_gt, 3)
+            #
+            #     pred_bboxes_center = pred_bboxes.bottom_center.numpy()
+            #
+            #     lidar2img = img_metas['lidar2img']  # (n_views, 4, 4)
+            #
+            #     # for each view
+            #     for idx, (img_view, lidar2img_view) in enumerate(zip(img,
+            #                                                          lidar2img)):
+            #         # check GT center in image view and apply mask to bboxes
+            #         gt_center_mask = self.are_points_in_image(
+            #             gt_bboxes_center, lidar2img_view, img_metas)
+            #         # (n_gt, )
+            #         gt_bboxes_view = gt_bboxes[gt_center_mask]
+            #         gt_labels_view = gt_labels[gt_center_mask]
+            #
+            #         # check Pred center in image view and apply mask to bboxes
+            #         pred_center_mask = self.are_points_in_image(
+            #             pred_bboxes_center, lidar2img_view, img_metas)
+            #         # (n_pred, )
+            #         pred_bboxes_view = pred_bboxes[pred_center_mask]
+            #         pred_labels_view = pred_labels[pred_center_mask]
+            #
+            #         filename_view = 'v_' + str(idx + 1)
+            #
+            #         show_multi_modality_result(
+            #             img_view,
+            #             gt_bboxes_view,
+            #             pred_bboxes_view,
+            #             lidar2img_view,
+            #             out_dir,
+            #             str(i),
+            #             box_mode='lidar',
+            #             show=False,
+            #             pred_labels=pred_labels_view,
+            #             gt_labels=gt_labels_view,
+            #             view=filename_view,
+            #             save=save_imgs
+            #         )
