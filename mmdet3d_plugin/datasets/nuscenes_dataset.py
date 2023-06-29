@@ -129,7 +129,7 @@ class CustomNuScenesDataset(NuScenesDataset):
         assert out_dir is not None, 'Expect out_dir, got none.'
         pipeline_compose = self._get_pipeline(pipeline)
         show_threshold = 0.2
-        save_imgs = True
+        save_imgs = False
         from tqdm import tqdm
         for i, result in tqdm(enumerate(results)):
             # if i not in [1389, 1456, 1943, 2334, 2642, 3352, 3619, 4044, 4402, 4826]:
