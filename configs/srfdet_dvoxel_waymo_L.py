@@ -195,7 +195,7 @@ model = dict(
     )
 )
 
-dataset_type = 'WaymoDataset'
+dataset_type = 'CustomWaymoDataset'
 data_root = 'data/waymo/kitti_format'
 
 file_client_args = dict(backend='disk')
@@ -248,7 +248,8 @@ test_pipeline = [
                 scale_ratio_range=[1.0, 1.0],
                 translation_std=[0, 0, 0]),
             dict(type='RandomFlip3D'),
-            dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
+            dict(type='PointsRangeFilter',
+                 point_cloud_range=point_cloud_range),
             dict(
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
@@ -256,6 +257,15 @@ test_pipeline = [
             dict(type='Collect3D', keys=['points'])
         ]
     )
+]
+
+eval_pipeline = [
+    dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=6, use_dim=5),
+    dict(
+        type='DefaultFormatBundle3D',
+        class_names=class_names,
+        with_label=False),
+    dict(type='Collect3D', keys=['points'])
 ]
 
 data = dict(
@@ -317,7 +327,7 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 lr_config = dict(
     policy='CosineAnnealing',
     warmup='linear',
-    warmup_iters=6*500,
+    warmup_iters=6 * 500,
     warmup_ratio=1.0 / 3,
     min_lr_ratio=1e-3)
 

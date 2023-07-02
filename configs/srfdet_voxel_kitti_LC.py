@@ -235,7 +235,7 @@ model = dict(
     )
 )
 
-dataset_type = 'KittiDataset'
+dataset_type = 'CustomKittiDataset'
 data_root = 'data/kitti/'
 
 file_client_args = dict(backend='disk')
@@ -300,11 +300,12 @@ eval_pipeline = [
         load_dim=4,
         use_dim=4,
         file_client_args=file_client_args),
+    dict(type='LoadImageFromFile'),
     dict(
         type='DefaultFormatBundle3D',
         class_names=class_names,
         with_label=False),
-    dict(type='Collect3D', keys=['points'])
+    dict(type='Collect3D', keys=['points', 'img'])
 ]
 data = dict(
     samples_per_gpu=4,

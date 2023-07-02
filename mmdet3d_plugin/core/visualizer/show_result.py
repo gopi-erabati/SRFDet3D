@@ -125,7 +125,7 @@ def show_result(points,
                 for i in labelDict:
                     vis.add_bboxes(
                         bbox3d=np.array(labelDict[i]),
-                        bbox_color=(0, 0, 1))  #palette(i)
+                        bbox_color=(0, 0, 1))  # palette(i)
 
         if gt_bboxes is not None:
             if gt_labels is None:
@@ -141,7 +141,7 @@ def show_result(points,
                 for i in labelDict:
                     vis.add_bboxes(
                         bbox3d=np.array(labelDict[i]),
-                        bbox_color=(0, 1, 0))  #palette(i)
+                        bbox_color=(0, 1, 0))  # palette(i)
         show_path = osp.join(result_path,
                              f'{filename}_online.png') if snapshot else None
         vis.show(show_path)
@@ -404,7 +404,7 @@ def show_multi_modality_result(img,
                                            proj_mat, img_metas,
                                            color=palette(i, bgr=True),
                                            thickness=2)
-            # rescale_factor = 0.25
+            # rescale_factor = 0.6
             # gt_img = mmcv.imrescale(gt_img, rescale_factor)
             mmcv.imwrite(gt_img, osp.join(result_path, f'{view}_gt.png'))
 
@@ -435,7 +435,7 @@ def show_multi_modality_result(img,
                                              proj_mat, img_metas,
                                              color=palette(i, bgr=True),
                                              thickness=2)
-            # rescale_factor = 0.25
+            # rescale_factor = 0.6
             # pred_img = mmcv.imrescale(pred_img, rescale_factor)
             mmcv.imwrite(pred_img, osp.join(result_path, f'{view}_pred.png'))
 
@@ -469,6 +469,9 @@ def show_bev_result(points, coord_type,
 
     bev_img = np.ones((bev_img_size, bev_img_size, 3), dtype=np.uint8) * 255
     bev_img[points[:, 0], points[:, 1]] = 128
+
+    result_path = osp.join(out_dir, filename)
+    mmcv.mkdir_or_exist(result_path)
 
     # show
     if show:
@@ -582,11 +585,13 @@ def show_bev_result(points, coord_type,
                     for i in labelDict:
                         gt_img = draw_bev_boxes(gt_corners_show[
                                                     labelDict[i]],
-                                                gt_img, (0, 255, 0),
-                                                # palette(i, bgr=True),
-                                                thickness=1)
+                                                gt_img,
+                                                # (0, 255, 0),
+                                                palette(i, bgr=True),
+                                                thickness=2)
             # gt_img = mmcv.imresize(gt_img, (400, 225))
-            mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_gt_{filename}.png'))
+            # mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_gt_{filename}.png'))
+            mmcv.imwrite(gt_img, osp.join(result_path, f'bev_gt.png'))
 
         # pred to bev
         if pred_bboxes is not None:
@@ -614,14 +619,402 @@ def show_bev_result(points, coord_type,
                         labelDict[i].append(j)
                     pred_img = bev_img.copy()
                     for i in labelDict:
-                        gt_img = draw_bev_boxes(pred_corners_show[
+                        pred_img = draw_bev_boxes(pred_corners_show[
                                                       labelDict[i]],
-                                                  gt_img, (255, 0, 0),
-                                                  # palette(i, bgr=True),
-                                                  thickness=1)
+                                                  pred_img,
+                                                  # (255, 0, 0),
+                                                  palette(i, bgr=True),
+                                                  thickness=2)
             # pred_img = mmcv.imresize(pred_img, (400, 225))
-            mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_pred'
-                                                     f'_{filename}.png'))
+            # mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_pred'
+            #                                          f'_{filename}.png'))
+            mmcv.imwrite(pred_img, osp.join(result_path, f'bev_pred.png'))
+
+
+def show_bev_result_kitti(points, coord_type,
+                          gt_bboxes, pred_bboxes,
+                          out_dir, filename, show,
+                          pred_labels=None, gt_labels=None,
+                          gt_bbox_color=(61, 102, 255),
+                          pred_bbox_color=(241, 101, 72),
+                          save=True,
+                          voxel_size=0.2,
+                          bev_img_size=512
+                          ):
+    # result_path = osp.join(out_dir, filename)
+    # mmcv.mkdir_or_exist(result_path)
+
+    #  #BEV Projection of points and boxes; show and save
+    # convert points to LiDARPoints
+    points_class = get_points_type(coord_type)
+    points = points_class(points, points_dim=points.shape[-1])
+    points_mask = points.in_range_3d(
+        [0, -40, -3, 70.4, 40, 1])  # filter
+    points = points[points_mask]
+    points = points.tensor.numpy()
+    points = points[:, 0:3] + [0.0, 40.0, 3.0]  # make them 0 tp
+    # 102.4
+    # voxel_size = 0.2
+    points = points / voxel_size  # divide by voxel size
+    points = points.astype(np.int)  # convert to int
+
+    bev_img = np.ones((704, 801, 3), dtype=np.uint8) * 255
+    bev_img[points[:, 0], points[:, 1]] = 128
+
+    result_path = osp.join(out_dir, filename)
+    mmcv.mkdir_or_exist(result_path)
+
+    # show
+    if show:
+        if gt_bboxes is not None:
+            # if there are no gt boxes, then don't draw anything
+            if gt_bboxes.tensor.size(0) == 0:
+                bev_img_show_gt = bev_img.copy()
+            else:
+                bev_img_show_gt = bev_img.copy()
+                # gt_corners = gt_bboxes.corners.numpy()  # (N, 8, 3)
+                gt_corners = get_bbox_corners(gt_bboxes.tensor.numpy())
+                gt_corners = gt_corners + [0.0, 40.0, 3.0]
+                gt_corners = gt_corners / voxel_size
+                gt_corners = gt_corners.astype(np.int)
+                gt_corners_show = gt_corners[:, [0, 1, 4, 2], 0:2]  # (N,
+                # 4, 2)
+                if gt_labels is None:
+                    bev_img_show_gt = draw_bev_boxes(gt_corners_show,
+                                                     bev_img_show_gt,
+                                                     color=gt_bbox_color)
+                else:
+                    palette = Colors()
+                    labelDict = {}
+                    for j in range(len(gt_labels)):
+                        i = int(gt_labels[j])
+                        if labelDict.get(i) is None:
+                            labelDict[i] = []
+                        labelDict[i].append(j)
+                    for i in labelDict:
+                        bev_img_show_gt = draw_bev_boxes(gt_corners_show[
+                                                             labelDict[i]],
+                                                         bev_img_show_gt,
+                                                         palette(i, bgr=True))
+        # bev_img_show_gt = mmcv.imrescale(bev_img_show_gt, 0.7)
+        window_name = 'LIDAR_BEV_GT'
+        location_xy = (400, 100)
+        cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+        cv2.moveWindow(window_name, *location_xy)
+        cv2.imshow(window_name, bev_img_show_gt)
+        cv2.waitKey()
+        # mmcv.imshow(bev_img_show_gt, win_name='bev_gt', wait_time=0)
+
+        # pred to bev
+        if pred_bboxes is not None:
+            # if there are no pred boxes, then don't draw anything
+            if pred_bboxes.tensor.size(0) == 0:
+                bev_img_show_pred = bev_img.copy()
+            else:
+                bev_img_show_pred = bev_img.copy()
+                # pred_corners = pred_bboxes.corners.numpy()  # (N, 8, 3)
+                pred_corners = get_bbox_corners(pred_bboxes.tensor.numpy())
+                pred_corners += [0.0, 40.0, 3.0]
+                pred_corners = pred_corners / voxel_size
+                pred_corners = pred_corners.astype(np.int)
+                pred_corners_show = pred_corners[:, [0, 1, 4, 2], 0:2]  # (N,
+                # 4, 2)
+                if pred_labels is None:
+                    bev_img_show_pred = draw_bev_boxes(pred_corners_show,
+                                                       bev_img_show_pred,
+                                                       color=pred_bbox_color)
+                else:
+                    palette = Colors()
+                    labelDict = {}
+                    for j in range(len(pred_labels)):
+                        i = int(pred_labels[j].numpy())
+                        if labelDict.get(i) is None:
+                            labelDict[i] = []
+                        labelDict[i].append(j)
+                    for i in labelDict:
+                        bev_img_show_pred = draw_bev_boxes(pred_corners_show[
+                                                               labelDict[i]],
+                                                           bev_img_show_pred,
+                                                           palette(i,
+                                                                   bgr=True))
+        # bev_img_show_pred = mmcv.imrescale(bev_img_show_pred, 0.7)
+        window_name = 'LIDAR_BEV_PRED'
+        location_xy = (400 + 600, 100)
+        cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+        cv2.moveWindow(window_name, *location_xy)
+        cv2.imshow(window_name, bev_img_show_pred)
+        cv2.waitKey()
+        # mmcv.imshow(bev_img_show_pred, win_name='bev_pred', wait_time=0)
+
+    if save:
+        # mmcv.imwrite(bev_img, osp.join(result_path, f'bev_img.png'))
+
+        # convert boxes to BEV
+        # gt
+        if gt_bboxes is not None:
+            # if there are no gt boxes, then don't draw anything
+            if gt_bboxes.tensor.size(0) == 0:
+                gt_img = bev_img.copy()
+            else:
+                # gt_corners = gt_bboxes.corners.numpy()  # (N, 8, 3)
+                gt_corners = get_bbox_corners(gt_bboxes.tensor.numpy())
+                gt_corners += [0.0, 40.0, 3.0]
+                gt_corners = gt_corners / voxel_size
+                gt_corners = gt_corners.astype(np.int)
+                gt_corners_show = gt_corners[:, [0, 1, 4, 2], 0:2]  # (N,
+                # 4, 2)
+                if gt_labels is None:
+                    gt_img = draw_bev_boxes(gt_corners_show, bev_img,
+                                            color=gt_bbox_color)
+                else:
+                    palette = Colors()
+                    labelDict = {}
+                    for j in range(len(gt_labels)):
+                        i = int(gt_labels[j])
+                        if labelDict.get(i) is None:
+                            labelDict[i] = []
+                        labelDict[i].append(j)
+                    gt_img = bev_img.copy()
+                    for i in labelDict:
+                        gt_img = draw_bev_boxes(gt_corners_show[
+                                                    labelDict[i]],
+                                                gt_img,
+                                                # (0, 255, 0),
+                                                palette(i, bgr=True),
+                                                thickness=2)
+            # gt_img = mmcv.imresize(gt_img, (400, 225))
+            # mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_gt_{filename}.png'))
+            mmcv.imwrite(gt_img, osp.join(result_path, f'bev_gt.png'))
+
+        # pred to bev
+        if pred_bboxes is not None:
+            # if there are no pred boxes, then don't draw anything
+            if pred_bboxes.tensor.size(0) == 0:
+                pred_img = bev_img.copy()
+            else:
+                # pred_corners = pred_bboxes.corners.numpy()  # (N, 8, 3)
+                pred_corners = get_bbox_corners(pred_bboxes.tensor.numpy())
+                pred_corners += [0.0, 40.0, 3.0]
+                pred_corners = pred_corners / voxel_size
+                pred_corners = pred_corners.astype(np.int)
+                pred_corners_show = pred_corners[:, [0, 1, 4, 2], 0:2]  # (N,
+                # 4, 2)
+                if pred_labels is None:
+                    pred_img = draw_bev_boxes(pred_corners_show, bev_img,
+                                              color=pred_bbox_color)
+                else:
+                    palette = Colors()
+                    labelDict = {}
+                    for j in range(len(pred_labels)):
+                        i = int(pred_labels[j].numpy())
+                        if labelDict.get(i) is None:
+                            labelDict[i] = []
+                        labelDict[i].append(j)
+                    pred_img = bev_img.copy()
+                    for i in labelDict:
+                        pred_img = draw_bev_boxes(pred_corners_show[
+                                                    labelDict[i]],
+                                                pred_img,
+                                                # (255, 0, 0),
+                                                palette(i, bgr=True),
+                                                thickness=2)
+            # pred_img = mmcv.imresize(pred_img, (400, 225))
+            # mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_pred'
+            #                                        f'_{filename}.png'))
+            mmcv.imwrite(pred_img, osp.join(result_path, f'bev_pred.png'))
+
+
+def show_bev_result_waymo(points, coord_type,
+                          gt_bboxes, pred_bboxes,
+                          out_dir, filename, show,
+                          pred_labels=None, gt_labels=None,
+                          gt_bbox_color=(61, 102, 255),
+                          pred_bbox_color=(241, 101, 72),
+                          save=True,
+                          voxel_size=0.2,
+                          bev_img_size=512
+                          ):
+    # result_path = osp.join(out_dir, filename)
+    # mmcv.mkdir_or_exist(result_path)
+
+    #  #BEV Projection of points and boxes; show and save
+    # convert points to LiDARPoints
+    points_class = get_points_type(coord_type)
+    points = points_class(points, points_dim=points.shape[-1])
+    points_mask = points.in_range_3d(
+        [-76.8, -76.8, -2, 76.8, 76.8, 4])  # filter
+    points = points[points_mask]
+    points = points.tensor.numpy()
+    points = points[:, 0:3] + [76.8, 76.8, 2]  # make them 0 tp
+    # 102.4
+    # voxel_size = 0.2
+    points = points / voxel_size  # divide by voxel size
+    points = points.astype(np.int)  # convert to int
+
+    bev_img = np.ones((768, 768, 3), dtype=np.uint8) * 255
+    bev_img[points[:, 0], points[:, 1]] = 128
+
+    # result_path = osp.join(out_dir, filename)
+    # mmcv.mkdir_or_exist(result_path)
+
+    # show
+    if show:
+        if gt_bboxes is not None:
+            # if there are no gt boxes, then don't draw anything
+            if gt_bboxes.tensor.size(0) == 0:
+                bev_img_show_gt = bev_img.copy()
+            else:
+                bev_img_show_gt = bev_img.copy()
+                # gt_corners = gt_bboxes.corners.numpy()  # (N, 8, 3)
+                gt_corners = get_bbox_corners(gt_bboxes.tensor.numpy())
+                gt_corners = gt_corners + [76.8, 76.8, 2]
+                gt_corners = gt_corners / voxel_size
+                gt_corners = gt_corners.astype(np.int)
+                gt_corners_show = gt_corners[:, [0, 1, 4, 2], 0:2]  # (N,
+                # 4, 2)
+                if gt_labels is None:
+                    bev_img_show_gt = draw_bev_boxes(gt_corners_show,
+                                                     bev_img_show_gt,
+                                                     color=gt_bbox_color)
+                else:
+                    palette = Colors()
+                    labelDict = {}
+                    for j in range(len(gt_labels)):
+                        i = int(gt_labels[j])
+                        if labelDict.get(i) is None:
+                            labelDict[i] = []
+                        labelDict[i].append(j)
+                    for i in labelDict:
+                        bev_img_show_gt = draw_bev_boxes(gt_corners_show[
+                                                             labelDict[i]],
+                                                         bev_img_show_gt,
+                                                         palette(i, bgr=True))
+        # bev_img_show_gt = mmcv.imrescale(bev_img_show_gt, 0.7)
+        window_name = 'LIDAR_BEV_GT'
+        location_xy = (200, 100)
+        cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+        cv2.moveWindow(window_name, *location_xy)
+        cv2.imshow(window_name, bev_img_show_gt)
+        cv2.waitKey()
+        # mmcv.imshow(bev_img_show_gt, win_name='bev_gt', wait_time=0)
+
+        # pred to bev
+        if pred_bboxes is not None:
+            # if there are no pred boxes, then don't draw anything
+            if pred_bboxes.tensor.size(0) == 0:
+                bev_img_show_pred = bev_img.copy()
+            else:
+                bev_img_show_pred = bev_img.copy()
+                # pred_corners = pred_bboxes.corners.numpy()  # (N, 8, 3)
+                pred_corners = get_bbox_corners(pred_bboxes.tensor.numpy())
+                pred_corners += [76.8, 76.8, 2]
+                pred_corners = pred_corners / voxel_size
+                pred_corners = pred_corners.astype(np.int)
+                pred_corners_show = pred_corners[:, [0, 1, 4, 2], 0:2]  # (N,
+                # 4, 2)
+                if pred_labels is None:
+                    bev_img_show_pred = draw_bev_boxes(pred_corners_show,
+                                                       bev_img_show_pred,
+                                                       color=pred_bbox_color)
+                else:
+                    palette = Colors()
+                    labelDict = {}
+                    for j in range(len(pred_labels)):
+                        i = int(pred_labels[j].numpy())
+                        if labelDict.get(i) is None:
+                            labelDict[i] = []
+                        labelDict[i].append(j)
+                    for i in labelDict:
+                        bev_img_show_pred = draw_bev_boxes(pred_corners_show[
+                                                               labelDict[i]],
+                                                           bev_img_show_pred,
+                                                           palette(i,
+                                                                   bgr=True))
+        # bev_img_show_pred = mmcv.imrescale(bev_img_show_pred, 0.7)
+        window_name = 'LIDAR_BEV_PRED'
+        location_xy = (200 + 800, 100)
+        cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+        cv2.moveWindow(window_name, *location_xy)
+        cv2.imshow(window_name, bev_img_show_pred)
+        cv2.waitKey()
+        # mmcv.imshow(bev_img_show_pred, win_name='bev_pred', wait_time=0)
+
+    if save:
+        # mmcv.imwrite(bev_img, osp.join(result_path, f'bev_img.png'))
+
+        # convert boxes to BEV
+        # gt
+        if gt_bboxes is not None:
+            # if there are no gt boxes, then don't draw anything
+            if gt_bboxes.tensor.size(0) == 0:
+                gt_img = bev_img.copy()
+            else:
+                # gt_corners = gt_bboxes.corners.numpy()  # (N, 8, 3)
+                gt_corners = get_bbox_corners(gt_bboxes.tensor.numpy())
+                gt_corners += [76.8, 76.8, 2]
+                gt_corners = gt_corners / voxel_size
+                gt_corners = gt_corners.astype(np.int)
+                gt_corners_show = gt_corners[:, [0, 1, 4, 2], 0:2]  # (N,
+                # 4, 2)
+                if gt_labels is None:
+                    gt_img = draw_bev_boxes(gt_corners_show, bev_img,
+                                            color=gt_bbox_color)
+                else:
+                    palette = Colors()
+                    labelDict = {}
+                    for j in range(len(gt_labels)):
+                        i = int(gt_labels[j])
+                        if labelDict.get(i) is None:
+                            labelDict[i] = []
+                        labelDict[i].append(j)
+                    gt_img = bev_img.copy()
+                    for i in labelDict:
+                        gt_img = draw_bev_boxes(gt_corners_show[
+                                                    labelDict[i]],
+                                                gt_img,
+                                                (0, 255, 0),
+                                                # palette(i, bgr=True),
+                                                thickness=2)
+            # gt_img = mmcv.imresize(gt_img, (400, 225))
+            # mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_gt_{filename}.png'))
+            # mmcv.imwrite(gt_img, osp.join(result_path, f'bev_gt.png'))
+
+        # pred to bev
+        if pred_bboxes is not None:
+            # if there are no pred boxes, then don't draw anything
+            if pred_bboxes.tensor.size(0) == 0:
+                pred_img = bev_img.copy()
+            else:
+                # pred_corners = pred_bboxes.corners.numpy()  # (N, 8, 3)
+                pred_corners = get_bbox_corners(pred_bboxes.tensor.numpy())
+                pred_corners += [76.8, 76.8, 2]
+                pred_corners = pred_corners / voxel_size
+                pred_corners = pred_corners.astype(np.int)
+                pred_corners_show = pred_corners[:, [0, 1, 4, 2], 0:2]  # (N,
+                # 4, 2)
+                if pred_labels is None:
+                    pred_img = draw_bev_boxes(pred_corners_show, bev_img,
+                                              color=pred_bbox_color)
+                else:
+                    palette = Colors()
+                    labelDict = {}
+                    for j in range(len(pred_labels)):
+                        i = int(pred_labels[j].numpy())
+                        if labelDict.get(i) is None:
+                            labelDict[i] = []
+                        labelDict[i].append(j)
+                    pred_img = bev_img.copy()
+                    for i in labelDict:
+                        gt_img = draw_bev_boxes(pred_corners_show[
+                                                    labelDict[i]],
+                                                gt_img,
+                                                (255, 0, 0),
+                                                # palette(i, bgr=True),
+                                                thickness=2)
+            # pred_img = mmcv.imresize(pred_img, (400, 225))
+            mmcv.imwrite(gt_img, osp.join(out_dir, f'bev_gt'
+                                                   f'_{filename}.png'))
+            # mmcv.imwrite(pred_img, osp.join(result_path, f'bev_pred.png'))
 
 
 def draw_bev_boxes(gt_bboxes, img, color, thickness=1):
