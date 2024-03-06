@@ -13,7 +13,7 @@ from mmdet3d_plugin.models.utils.grid_mask import GridMask
 @DETECTORS.register_module()
 class SRFDet(Base3DDetector):
     """
-    DDet3D is Diffusion based 3D Object Detection
+    SRFDet is Sparse Region Fusion based 3D Object Detection
     """
     def __init__(self,
                  use_img=False,

@@ -105,7 +105,6 @@ venv.bak/
 .mypy_cache/
 
 # cython generated cpp
-data
 .vscode
 .idea
 
@@ -124,13 +123,11 @@ mmdet3d/.mim
 # demo
 *.jpg
 *.png
-data/s3dis/Stanford3dDataset_v1.2_Aligned_Version/
-data/scannet/scans/
-data/sunrgbd/OFFICIAL_SUNRGBD/
 *.obj
 *.ply
-data/
-ckpts/
+data/nuscenes
+data/kitti
+data/waymo
 
 # Waymo evaluation
 mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main
