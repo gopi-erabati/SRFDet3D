@@ -14,19 +14,19 @@ This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Regi
 ### nuScenes dataset
 | Config | mAP | NDS | |
 | :---: | :---: |:---: |:---: |
-| srfdet_voxel_nusc_L | 63.1 | 68.5 | [weights](https://drive.google.com/file/d/1d9g7kbtCceGsvmh1iX3BtkJyIZPzdkV5/view?usp=sharing) |
-| srfdet_voxel_nusc_LC | 64.7 | 68.6 | [weights](https://drive.google.com/file/d/1kD-nz7dYpg804YF1Qmsrz3jlSz13f_qU/view?usp=sharing) |
+| [srfdet_voxel_nusc_L](configs/nus/srfdet_voxel_nusc_L.py) | 63.1 | 68.5 | [weights](https://drive.google.com/file/d/1d9g7kbtCceGsvmh1iX3BtkJyIZPzdkV5/view?usp=sharing) |
+| [srfdet_voxel_nusc_LC](configs/nus/srfdet_voxel_nusc_LC.py) | 64.7 | 68.6 | [weights](https://drive.google.com/file/d/1kD-nz7dYpg804YF1Qmsrz3jlSz13f_qU/view?usp=sharing) |
 
 ### KITTI dataset
 | Config | Car easy | Car mod. | Car hard | Ped. easy | Ped. mod. | Ped. hard | Cyc. easy | Cyc. mod. | Cyc. hard | |
 | :---:  | :---:  | :---:  | :---:  | :---:  | :---:  | :---:  | :---: | :---:  | :---:  | :---:  |
-| srfdet_voxel_kitti_L | 94.2 | 89.3 | 85.6 | 57.9 | 52.1 | 47.9 | 81.5 | 63.6 | 58.9 | [weights](https://drive.google.com/file/d/1Gbl_LBL0o367jmGLXkiLlYg-Uy4Qxvnh/view?usp=sharing) |
-| srfdet_voxel_kitti_LC | 94.9 | 87.8 | 84.9 | 58.1 | 55.5 | 49.7 | 82.3 | 63.7 | 59.8 | [weights](https://drive.google.com/file/d/1S3tDxPWJ9Ic_-NPUFuvf8AfeafIioAOA/view?usp=sharing) |
+| [srfdet_voxel_kitti_L](configs/kitti/srfdet_voxel_kitti_L.py) | 94.2 | 89.3 | 85.6 | 57.9 | 52.1 | 47.9 | 81.5 | 63.6 | 58.9 | [weights](https://drive.google.com/file/d/1Gbl_LBL0o367jmGLXkiLlYg-Uy4Qxvnh/view?usp=sharing) |
+| [srfdet_voxel_kitti_LC](configs/kitti/srfdet_voxel_kitti_LC.py) | 94.9 | 87.8 | 84.9 | 58.1 | 55.5 | 49.7 | 82.3 | 63.7 | 59.8 | [weights](https://drive.google.com/file/d/1S3tDxPWJ9Ic_-NPUFuvf8AfeafIioAOA/view?usp=sharing) |
 
 ### Waymo dataset (mAPH)
 | Config | Veh. L1 | Veh. L2 | Ped. L1  | Ped. L2  | Cyc. L1 | Cyc. L2 |
 | :---:  | :---:  | :---:  | :---:  | :---:  | :---:  | :---:  |
-| srfdet_dvoxel_waymo_L | 71.9 | 63.6 | 64.9 | 57.0 | 66.2 | 63.7 |
+| [srfdet_dvoxel_waymo_L](configs/waymo/srfdet_dvoxel_waymo_L.py) | 71.9 | 63.6 | 64.9 | 57.0 | 66.2 | 63.7 |
 
 We can not distribute the model weights on Waymo dataset due to the [Waymo license terms](https://waymo.com/open/terms).
 
