@@ -4,13 +4,13 @@ This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Regi
 
 **Contents**
 1. [Overview](https://github.com/gopi-erabati/SRFDet3D#overview)
-2. [Results](https://github.com/gopi-erabati/SRFDet3D/tree/master#results)
-3. [Requirements, Installation and Usage](https://github.com/gopi-erabati/SRFDet3D/tree/master#requirements-installation-and-usage)
-    1. [Prerequistes](https://github.com/gopi-erabati/SRFDet3D/tree/master#prerequisites)
-    2. [Installation](https://github.com/gopi-erabati/SRFDet3D/tree/master#installation)
-    3. [Training](https://github.com/gopi-erabati/SRFDet3D/tree/master#training)
-    4. [Testing](https://github.com/gopi-erabati/SRFDet3D/tree/master#testing)
-4. [Acknowledgements](https://github.com/gopi-erabati/SRFDet3D/tree/master#acknowlegements)
+2. [Results](https://github.com/gopi-erabati/SRFDet3D#results)
+3. [Requirements, Installation and Usage](https://github.com/gopi-erabati/SRFDet3D#requirements-installation-and-usage)
+    1. [Prerequistes](https://github.com/gopi-erabati/SRFDet3D#prerequisites)
+    2. [Installation](https://github.com/gopi-erabati/SRFDet3D#installation)
+    3. [Training](https://github.com/gopi-erabati/SRFDet3D#training)
+    4. [Testing](https://github.com/gopi-erabati/SRFDet3D#testing)
+4. [Acknowledgements](https://github.com/gopi-erabati/SRFDet3D#acknowlegements)
 
 ## Overview
 
