@@ -4,13 +4,13 @@ This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Regi
 
 **Contents**
 1. [Overview](https://github.com/gopi-erabati/SRFDet3D/tree/master#overview)
-2. [Results](https://github.com/gopi-erabati/SRFDet3D/blob/master/README.md#results)
-3. [Requirements, Installation and Usage](https://github.com/gopi-erabati/SRFDet3D/blob/master/README.md#requirements-installation-and-usage)
-    1. [Prerequistes](https://github.com/gopi-erabati/SRFDet3D/blob/master/README.md#prerequisite)
-    2. [Installation](https://github.com/gopi-erabati/SRFDet3D/blob/master/README.md#installation)
-    3. [Training](https://github.com/gopi-erabati/SRFDet3D/blob/master/README.md#training)
-    4. [Testing](https://github.com/gopi-erabati/SRFDet3D/blob/master/README.md#testing)
-4. [Acknowledgements](https://github.com/gopi-erabati/SRFDet3D/blob/master/README.md#acknowlegements)
+2. [Results](https://github.com/gopi-erabati/SRFDet3D/tree/master#results)
+3. [Requirements, Installation and Usage](https://github.com/gopi-erabati/SRFDet3D/tree/master#requirements-installation-and-usage)
+    1. [Prerequistes](https://github.com/gopi-erabati/SRFDet3D/tree/master#prerequisites)
+    2. [Installation](https://github.com/gopi-erabati/SRFDet3D/tree/master#installation)
+    3. [Training](https://github.com/gopi-erabati/SRFDet3D/tree/master#training)
+    4. [Testing](https://github.com/gopi-erabati/SRFDet3D/tree/master#testing)
+4. [Acknowledgements](https://github.com/gopi-erabati/SRFDet3D/tree/master#acknowlegements)
 
 ## Overview
 
@@ -42,7 +42,7 @@ We can not distribute the model weights on Waymo dataset due to the [Waymo licen
 
 ## Requirements, Installation and Usage
 
-### Prerequisite
+### Prerequisites
 
 The code is tested on the following configuration:
 - Ubuntu 20.04.6 LTS
