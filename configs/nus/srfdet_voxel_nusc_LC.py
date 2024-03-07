@@ -390,7 +390,7 @@ log_config = dict(
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = None
-load_from = '/home/gopi/PhD/code/objdet/projects/SRFDet/ckpts/srfdet_voxel_nusc_L_fade_ep20.pth'
+load_from = None
 resume_from = None
 workflow = [('train', 1)]
 

@@ -396,7 +396,7 @@ log_config = dict(
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = None
-load_from = '/mnt/hdd4/achieve-itn/PhD/Code/workdirs/SRFDet/srfdet_voxel_kitti_L_3class_fade/epoch_39.pth'
+load_from = None
 resume_from = None
 workflow = [('train', 1)]
 

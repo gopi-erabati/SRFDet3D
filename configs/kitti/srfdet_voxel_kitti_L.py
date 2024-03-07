@@ -80,7 +80,7 @@ model = dict(
         norm_cfg=dict(type='BN2d', eps=1e-3, momentum=0.01),
         act_cfg=dict(type='ReLU'),
         in_channels=[128, 256],
-        out_channels=128,
+        out_channels=256,
         start_level=0,
         num_outs=4,
         init_cfg=dict(type='Pretrained',
@@ -92,7 +92,7 @@ model = dict(
     bbox_head=dict(
         type='SRFDetHead',
         num_classes=len(class_names),
-        feat_channels_lidar=128,
+        feat_channels_lidar=256,
         feat_channels_img=256,
         lidar_feat_lvls=lidar_feat_lvls,
         img_feat_lvls=4,
@@ -130,12 +130,12 @@ model = dict(
             type='SingleSRFDetHeadLiDAR',
             num_cls_convs=2,
             num_reg_convs=3,
-            dim_feedforward=512,
+            dim_feedforward=1024,
             num_heads=8,
             dropout=0.1,
             bbox_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             act_cfg=dict(type='ReLU', inplace=True),
-            dynamic_conv=dict(dynamic_dim=32, dynamic_num=2),
+            dynamic_conv=dict(dynamic_dim=64, dynamic_num=2),
             pc_range=point_cloud_range,
             voxel_size=voxel_size,
         ),
@@ -153,7 +153,7 @@ model = dict(
         roi_extractor_lidar=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
-            out_channels=128,
+            out_channels=256,
             featmap_strides=[8, 16, 32, 64]),
         roi_extractor_img=dict(
             type='SingleRoIExtractor',
@@ -172,11 +172,11 @@ model = dict(
         loss_bbox=dict(type='L1Loss',
                        reduction='sum',  # remove for Hungarian
                        loss_weight=0.25),
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint=
-            '/mnt/hdd4/achieve-itn/PhD/Code/workdirs/SRFDet/srfdet_voxel_nusc_L_fade/epoch_20.pth',
-            prefix='bbox_head.'),
+        # init_cfg=dict(
+        #     type='Pretrained',
+        #     checkpoint=
+        #     '/mnt/hdd4/achieve-itn/PhD/Code/workdirs/SRFDet/srfdet_voxel_nusc_L_fade/epoch_20.pth',
+        #     prefix='bbox_head.'),
     ),
     # model training and testing settings
     test_cfg=dict(
