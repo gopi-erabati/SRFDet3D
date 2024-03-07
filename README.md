@@ -3,7 +3,7 @@
 This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Region Fusion based 3D Object Detection**, by Gopi Krishna Erabati and Helder Araujo.
 
 **Contents**
-1. [Overview](https://github.com/gopi-erabati/SRFDet3D/tree/master#overview)
+1. [Overview](https://github.com/gopi-erabati/SRFDet3D#overview)
 2. [Results](https://github.com/gopi-erabati/SRFDet3D/tree/master#results)
 3. [Requirements, Installation and Usage](https://github.com/gopi-erabati/SRFDet3D/tree/master#requirements-installation-and-usage)
     1. [Prerequistes](https://github.com/gopi-erabati/SRFDet3D/tree/master#prerequisites)
