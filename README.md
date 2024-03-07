@@ -4,7 +4,7 @@ This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Regi
 
 **Contents**
 1. [Overview](https://github.com/gopi-erabati/SRFDet3D#overview)
-2. [Results](https://github.com/gopi-erabati/SRFDet3D?tab=readme-ov-file#results)
+2. [Results](https://github.com/gopi-erabati/SRFDet3D#results)
 3. [Requirements, Installation and Usage](https://github.com/gopi-erabati/SRFDet3D#requirements-installation-and-usage)
     1. [Prerequistes](https://github.com/gopi-erabati/SRFDet3D#prerequisites)
     2. [Installation](https://github.com/gopi-erabati/SRFDet3D#installation)
