@@ -84,8 +84,8 @@ Follow [MMDetection3D-1.0.0.rc6](https://github.com/open-mmlab/mmdetection3d/tre
 
 ### Clone the repository
 ```
-git clone https://github.com/gopi-erabati/SRFDet.git
-cd SRFDet
+git clone https://github.com/gopi-erabati/SRFDet3D.git
+cd SRFDet3D
 ```
 
 ### Training
