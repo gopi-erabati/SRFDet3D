@@ -9,18 +9,19 @@ This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Regi
 ## Results
 
 ### Predictions on nuScenes dataset
+![SRFDet3D_ Sparse Region Fusion based 3D Object Detection _ 3D Object Detection _ Autonomous Driving](https://github.com/gopi-erabati/SRFDet/assets/22390149/499732fb-7968-4bcd-ba43-b18cf7ce81f5)
 
 ### nuScenes dataset
 | Config | mAP | NDS | |
 | :---: | :---: |:---: |:---: |
-| srfdet_voxel_nusc_L | 63.1 | 68.5 | weights |
-| srfdet_voxel_nusc_LC | 64.7 | 68.6 | weights |
+| srfdet_voxel_nusc_L | 63.1 | 68.5 | [weights](https://drive.google.com/file/d/1d9g7kbtCceGsvmh1iX3BtkJyIZPzdkV5/view?usp=sharing) |
+| srfdet_voxel_nusc_LC | 64.7 | 68.6 | [weights](https://drive.google.com/file/d/1kD-nz7dYpg804YF1Qmsrz3jlSz13f_qU/view?usp=sharing) |
 
 ### KITTI dataset
 | Config | Car easy | Car mod. | Car hard | Ped. easy | Ped. mod. | Ped. hard | Cyc. easy | Cyc. mod. | Cyc. hard | |
 | :---:  | :---:  | :---:  | :---:  | :---:  | :---:  | :---:  | :---: | :---:  | :---:  | :---:  |
-| srfdet_voxel_kitti_L | 94.2 | 89.3 | 85.6 | 57.9 | 52.1 | 47.9 | 81.5 | 63.6 | 58.9 | weights |
-| srfdet_voxel_kitti_LC | 94.9 | 87.8 | 84.9 | 58.1 | 55.5 | 49.7 | 82.3 | 63.7 | 59.8 | weights |
+| srfdet_voxel_kitti_L | 94.2 | 89.3 | 85.6 | 57.9 | 52.1 | 47.9 | 81.5 | 63.6 | 58.9 | [weights](https://drive.google.com/file/d/1Gbl_LBL0o367jmGLXkiLlYg-Uy4Qxvnh/view?usp=sharing) |
+| srfdet_voxel_kitti_LC | 94.9 | 87.8 | 84.9 | 58.1 | 55.5 | 49.7 | 82.3 | 63.7 | 59.8 | [weights](https://drive.google.com/file/d/1S3tDxPWJ9Ic_-NPUFuvf8AfeafIioAOA/view?usp=sharing) |
 
 ### Waymo dataset (mAPH)
 | Config | Veh. L1 | Veh. L2 | Ped. L1  | Ped. L2  | Cyc. L1 | Cyc. L2 |
@@ -45,7 +46,7 @@ The code is tested on the following configuration:
 
 ### Installation
 ```
-mkvirtualenv delivotr
+mkvirtualenv srfdet3d
 
 pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
 pip install -U openmim
@@ -74,7 +75,7 @@ sudo apt install build-essential
 bazel clean
 
 bazel build waymo_open_dataset/metrics/tools/compute_detection_metrics_main
-cp bazel-bin/waymo_open_dataset/metrics/tools/compute_detection_metrics_main ../DeLiVoTr/lib//core/evaluation/waymo_utils/
+cp bazel-bin/waymo_open_dataset/metrics/tools/compute_detection_metrics_main ../SRFDet3D/mmdet3d_plugin/core/evaluation/waymo_utils/
 ```
 
 ### Data
@@ -88,34 +89,51 @@ cd SRFDet
 ```
 
 ### Training
+
 #### nuScenes dataset
+- Download the [backbone pretrained weights](https://drive.google.com/drive/folders/1FMigS3eA4gdd-g9c46nc5qtvEicgdAfA?usp=sharing) to `ckpts/`
+- Single GPU training
+    1. Add the present working directory to PYTHONPATH `export PYTHONPATH=$(pwd):$PYTHONPATH`
+    2. `python tools/train.py configs/nus/srfdet_voxel_nusc_L.py --work-dir {WORK_DIR}` for LiDAR-only model and `python tools/train.py configs/kitti/srfdet_voxel_nusc_LC.py --work-dir {WORK_DIR} --cfg-options load_from=/path/to/lidar-only/model` for LiDAR-Camera fusion model.
+- Multi GPU training
+  `tools/dist_train.sh configs/nus/srfdet_voxel_nusc_L.py {GPU_NUM} --work-dir {WORK_DIR}` for LiDAR-only model and `tools/dist_train.sh configs/nus/srfdet_voxel_nusc_LC.py {GPU_NUM} --work-dir {WORK_DIR} --cfg-options load_from=/path/to/lidar-only/model` for LiDAR-Camera fusion model.
+ 
+#### KITTI dataset
+- Download the [backbone pretrained weights](https://drive.google.com/drive/folders/1FMigS3eA4gdd-g9c46nc5qtvEicgdAfA?usp=sharing) to `ckpts/` 
+- Single GPU training
+    1. Add the present working directory to PYTHONPATH `export PYTHONPATH=$(pwd):$PYTHONPATH`
+    2. `python tools/train.py configs/kitti/srfdet_voxel_kitti_L.py --work-dir {WORK_DIR}` for LiDAR-only model and `python tools/train.py configs/kitti/srfdet_voxel_kitti_LC.py --work-dir {WORK_DIR} --cfg-options load_from=/path/to/lidar-only/model` for LiDAR-Camera fusion model.
+- Multi GPU training
+  `tools/dist_train.sh configs/kitti/srfdet_voxel_kitti_L.py {GPU_NUM} --work-dir {WORK_DIR}` for LiDAR-only model and `tools/dist_train.sh configs/kitti/srfdet_voxel_kitti_LC.py {GPU_NUM} --work-dir {WORK_DIR} --cfg-options load_from=/path/to/lidar-only/model` for LiDAR-Camera fusion model.
 
 #### Waymo dataset 
 - Single GPU training
-    1. `export PYTHONPATH=$(pwd):$PYTHONPATH`
-    2. `python tools/train.py configs/delivotr_waymo.py --work-dir {WORK_DIR}`
+    1. Add the present working directory to PYTHONPATH `export PYTHONPATH=$(pwd):$PYTHONPATH`
+    2. `python tools/train.py configs/waymo/srfdet_dvoxel_waymo_L.py --work-dir {WORK_DIR}`
 - Multi GPU training
-  `tools/dist_train.sh configs/delivotr_waymo.py {GPU_NUM} --work-dir {WORK_DIR}`
-#### KITTI dataset
-- Single GPU training
-    1. `export PYTHONPATH=$(pwd):$PYTHONPATH`
-    2. `python tools/train.py configs/delivotr_kitti.py --work-dir {WORK_DIR}`
-- Multi GPU training
-  `tools/dist_train.sh configs/delivotr_kitti.py {GPU_NUM} --work-dir {WORK_DIR}`
+  `tools/dist_train.sh configs/waymo/srfdet_dvoxel_waymo_L.py {GPU_NUM} --work-dir {WORK_DIR}`
 
 ### Testing
-#### Waymo dataset 
+
+#### nuScenes dataset
 - Single GPU testing
-    1. `export PYTHONPATH=$(pwd):$PYTHONPATH`
-    2. `python tools/test.py configs/delivotr_waymo.py /path/to/ckpt --eval waymo`
+    1. Add the present working directory to PYTHONPATH `export PYTHONPATH=$(pwd):$PYTHONPATH`
+    2. `python tools/test.py configs/nus/srfdet_voxel_nusc_L.py /path/to/ckpt --eval mAP` for LiDAR-only model and `python tools/test.py configs/nus/srfdet_voxel_nusc_LC.py /path/to/ckpt --eval mAP` for LiDAR-Camera fusion model.
 - Multi GPU training
-  `tools/dist_test.sh configs/delivotr_waymo.py /path/to/ckpt {GPU_NUM} --eval waymo`
+  `tools/dist_test.sh configs/nus/srfdet_voxel_nusc_L.py /path/to/ckpt {GPU_NUM} --eval mAP` for LiDAR-only model and `tools/dist_test.sh configs/nus/srfdet_voxel_nusc_LC.py /path/to/ckpt {GPU_NUM} --eval mAP` for LiDAR-Camera fusion model.
+ 
 #### KITTI dataset
 - Single GPU testing
-    1. `export PYTHONPATH=$(pwd):$PYTHONPATH`
-    2. `python tools/test.py configs/delivotr_kitti.py /path/to/ckpt --eval mAP`
+    1. Add the present working directory to PYTHONPATH `export PYTHONPATH=$(pwd):$PYTHONPATH`
+    2. `python tools/test.py configs/kitti/srfdet_voxel_kitti_L.py /path/to/ckpt --eval mAP` for LiDAR-only model and `python tools/test.py configs/kitti/srfdet_voxel_kitti_LC.py /path/to/ckpt --eval mAP` for LiDAR-Camera fusion model.
 - Multi GPU training
-  `tools/dist_test.sh configs/delivotr_kitti.py /path/to/ckpt {GPU_NUM} --eval mAP`
+  `tools/dist_test.sh configs/kitti/srfdet_voxel_kitti_L.py /path/to/ckpt {GPU_NUM} --eval mAP` for LiDAR-only model and `tools/dist_test.sh configs/kitti/srfdet_voxel_kitti_LC.py /path/to/ckpt {GPU_NUM} --eval mAP` for LiDAR-Camera fusion model.
+
+#### Waymo dataset 
+- Single GPU testing
+    1. Add the present working directory to PYTHONPATH `export PYTHONPATH=$(pwd):$PYTHONPATH`
+    2. `python tools/test.py configs/waymo/srfdet_dvoxel_waymo_L.py /path/to/ckpt --eval waymo`
+  `tools/dist_test.sh configs/waymo/srfdet_dvoxel_waymo_L.py /path/to/ckpt {GPU_NUM} --eval waymo`
 
 ## Acknowlegements
-We sincerely thank the contributors for their open-source code: [MMCV](https://github.com/open-mmlab/mmcv), [MMDetection](https://github.com/open-mmlab/mmdetection), [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), [SST](https://github.com/tusen-ai/SST), [DeLighT](https://github.com/sacmehta/delight).
+We sincerely thank the contributors for their open-source code: [MMCV](https://github.com/open-mmlab/mmcv), [MMDetection](https://github.com/open-mmlab/mmdetection), [MMDetection3D](https://github.com/open-mmlab/mmdetection3d).
