@@ -13,6 +13,8 @@ This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Regi
 4. [Acknowledgements](https://github.com/gopi-erabati/SRFDet3D#acknowlegements)
 
 ## Overview
+Unlike the earlier 3D object detection approaches that formulate hand-crafted dense (in thousands) object proposals by leveraging anchors on dense feature maps, we formulate np (in hundreds) number of learnable sparse object proposals to predict 3D bounding box parameters. The sparse proposals in our approach are not only learnt during training but also are input-dependent, so they represent better object candidates during inference. Leveraging the sparse proposals, we fuse only the sparse regions of multi-modal features and we propose Sparse Region Fusion based 3D object Detection (SRFDet3D) network with mainly three components: an encoder for feature extraction, a region proposal generation module for sparse input-dependent proposals and a decoder for multi-modal feature fusion and iterative refinement of object proposals. Additionally for optimal training, we formulate our sparse detector with many-to-one label assignment based on Optimal Transport Algorithm (OTA). We conduct extensive experiments and analysis on publicly available large-scale autonomous driving datasets: nuScenes, KITTI, and Waymo. Our LiDAR-only SRFDet3D-L network achieves 63.1 mAP and
+outperforms the state-of-the-art networks on the nuScenes dataset, surpassing the dense detectors on KITTI and Waymo datasets. Our LiDAR-Camera model SRFDet3D achieves 64.7 mAP with improvements over existing fusion methods.
 
 ![SRFDet3D](https://github.com/gopi-erabati/SRFDet/assets/22390149/39994836-0355-4423-adb6-5c328548b2e4)
 
