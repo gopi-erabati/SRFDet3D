@@ -111,7 +111,7 @@ cd SRFDet3D
 - Download the [backbone pretrained weights](https://drive.google.com/drive/folders/1FMigS3eA4gdd-g9c46nc5qtvEicgdAfA?usp=sharing) to `ckpts/`
 - Single GPU training
     1. Add the present working directory to PYTHONPATH `export PYTHONPATH=$(pwd):$PYTHONPATH`
-    2. `python tools/train.py configs/nus/srfdet_voxel_nusc_L.py --work-dir {WORK_DIR}` for LiDAR-only model and `python tools/train.py configs/kitti/srfdet_voxel_nusc_LC.py --work-dir {WORK_DIR} --cfg-options load_from=/path/to/lidar-only/model` for LiDAR-Camera fusion model.
+    2. `python tools/train.py configs/nus/srfdet_voxel_nusc_L.py --work-dir {WORK_DIR}` for LiDAR-only model and `python tools/train.py configs/nus/srfdet_voxel_nusc_LC.py --work-dir {WORK_DIR} --cfg-options load_from=/path/to/lidar-only/model` for LiDAR-Camera fusion model.
 - Multi GPU training
   `tools/dist_train.sh configs/nus/srfdet_voxel_nusc_L.py {GPU_NUM} --work-dir {WORK_DIR}` for LiDAR-only model and `tools/dist_train.sh configs/nus/srfdet_voxel_nusc_LC.py {GPU_NUM} --work-dir {WORK_DIR} --cfg-options load_from=/path/to/lidar-only/model` for LiDAR-Camera fusion model.
  
