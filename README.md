@@ -2,6 +2,8 @@
 
 This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Region Fusion based 3D Object Detection**, by Gopi Krishna Erabati and Helder Araujo.
 
+Gopi Krishna Erabati and Helder Araujo, ``[SRFDet3D: Sparse Region Fusion based 3D Object Detection](https://doi.org/10.1016/j.neucom.2024.127814),'' *Neurocomputing*, vol. 593, 2024.
+
 **Contents**
 1. [Overview](https://github.com/gopi-erabati/SRFDet3D#overview)
 2. [Results](https://github.com/gopi-erabati/SRFDet3D#results)
@@ -11,6 +13,7 @@ This is the official PyTorch implementation of the paper **SRFDet3D: Sparse Regi
     3. [Training](https://github.com/gopi-erabati/SRFDet3D#training)
     4. [Testing](https://github.com/gopi-erabati/SRFDet3D#testing)
 4. [Acknowledgements](https://github.com/gopi-erabati/SRFDet3D#acknowlegements)
+5. [Reference](https://github.com/gopi-erabati/SRFDet3D#reference)
 
 ## Overview
 Unlike the earlier 3D object detection approaches that formulate hand-crafted dense (in thousands) object proposals by leveraging anchors on dense feature maps, we formulate np (in hundreds) number of learnable sparse object proposals to predict 3D bounding box parameters. The sparse proposals in our approach are not only learnt during training but also are input-dependent, so they represent better object candidates during inference. Leveraging the sparse proposals, we fuse only the sparse regions of multi-modal features and we propose Sparse Region Fusion based 3D object Detection (SRFDet3D) network with mainly three components: an encoder for feature extraction, a region proposal generation module for sparse input-dependent proposals and a decoder for multi-modal feature fusion and iterative refinement of object proposals. Additionally for optimal training, we formulate our sparse detector with many-to-one label assignment based on Optimal Transport Algorithm (OTA). We conduct extensive experiments and analysis on publicly available large-scale autonomous driving datasets: nuScenes, KITTI, and Waymo. Our LiDAR-only SRFDet3D-L network achieves 63.1 mAP and
@@ -151,3 +154,18 @@ cd SRFDet3D
 
 ## Acknowlegements
 We sincerely thank the contributors for their open-source code: [MMCV](https://github.com/open-mmlab/mmcv), [MMDetection](https://github.com/open-mmlab/mmdetection), [MMDetection3D](https://github.com/open-mmlab/mmdetection3d).
+
+## Reference
+```
+@article{ERABATI2024127814,
+title = {SRFDet3D: Sparse Region Fusion based 3D Object Detection},
+journal = {Neurocomputing},
+volume = {593},
+pages = {127814},
+year = {2024},
+issn = {0925-2312},
+doi = {https://doi.org/10.1016/j.neucom.2024.127814},
+url = {https://www.sciencedirect.com/science/article/pii/S092523122400585X},
+author = {Gopi Krishna Erabati and Helder Araujo},
+}
+```
